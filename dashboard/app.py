@@ -10,12 +10,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
-
 st.set_page_config(page_title="Credit Risk Decision Intelligence Platform", layout="wide", page_icon="◆")
 
 DB_USER = "root"
-DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_PASSWORD = os.getenv("DB_PASSWORD")  
 DB_HOST = "localhost"
 DB_NAME = "credit_risk_platform"
 
@@ -67,54 +65,75 @@ def inject_css():
         padding-top: 1.5rem;
     }
 
-    .brand-seal {
-        width: 64px;
-        height: 44px;
-        border: 1px solid var(--gold);
+    .brand-row {
         display: flex;
         align-items: center;
-        justify-content: center;
-        font-family: 'Fraunces', serif;
-        font-size: 15px;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+
+    .brand-icon {
         color: var(--gold);
+        flex-shrink: 0;
+    }
+
+    .brand-wordmark {
+        font-family: 'Fraunces', serif;
+        font-size: 22px;
+        font-weight: 500;
         letter-spacing: 0.04em;
-        margin-bottom: 12px;
+        color: var(--gold);
+    }
+
+    .brand-full {
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 10.5px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 10px;
     }
 
     .brand-name {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 11px;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: var(--text);
-        margin-bottom: 2px;
-    }
-
-    .brand-tag {
         font-family: 'IBM Plex Sans', sans-serif;
-        font-size: 11px;
+        font-size: 11.5px;
         color: var(--muted);
         margin-bottom: 18px;
     }
 
     .brand-divider {
         border-top: 1px solid var(--border);
-        margin-bottom: 18px;
+        margin-bottom: 10px;
     }
 
-    div[data-testid="stRadio"] label {
+    .nav-link {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 9px 12px;
+        margin-bottom: 3px;
+        border-radius: 8px;
+        text-decoration: none;
+        color: var(--muted);
         font-family: 'IBM Plex Sans', sans-serif;
         font-size: 14px;
-        color: var(--muted);
-        padding: 6px 0;
+        transition: background 0.15s ease;
     }
 
-    div[data-testid="stRadio"] label:has(input:checked) {
+    .nav-link:hover {
+        background: var(--surface-2);
+        color: var(--text);
+    }
+
+    .nav-link-active {
+        background: var(--surface-2);
         color: var(--gold);
+        border-left: 2px solid var(--gold);
+        padding-left: 10px;
     }
 
-    div[data-testid="stRadio"] > div {
-        gap: 2px;
+    .nav-link svg {
+        flex-shrink: 0;
     }
 
     .eyebrow {
@@ -235,11 +254,20 @@ def inject_css():
     """, unsafe_allow_html=True)
 
 
+COIN_ICON = """<svg class="brand-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="9"/><path d="M12 7 L12 17 M9.3 9.5 Q9.3 7.8 12 7.8 Q14.7 7.8 14.7 9.5 Q14.7 11.2 12 11.2 Q9.3 11.2 9.3 12.8 Q9.3 14.5 12 14.5 Q14.7 14.5 14.7 12.8"/></svg>"""
+
+ICON_OVERVIEW = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="3.2" height="9"/><rect x="10.4" y="5" width="3.2" height="14"/><rect x="16.8" y="13" width="3.2" height="6"/></svg>"""
+
+ICON_ANALYTICS = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19 L4 5"/><path d="M4 19 L20 19"/><circle cx="8" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="13" cy="9" r="1.3" fill="currentColor" stroke="none"/><circle cx="17.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg>"""
+
+ICON_EXPLAIN = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="6"/><path d="M15 15 L20 20"/></svg>"""
+
+
 def render_sidebar_brand():
-    st.sidebar.markdown("""
-    <div class="brand-seal">CRIP</div>
+    st.sidebar.markdown(f"""
+    <div class="brand-row">{COIN_ICON}<span class="brand-wordmark">CRIP</span></div>
+    <div class="brand-full">Credit Risk Intelligence Platform</div>
     <div class="brand-name">Nurmuhammad Nazmi</div>
-    <div class="brand-tag">Credit Risk Intelligence</div>
     <div class="brand-divider"></div>
     """, unsafe_allow_html=True)
 
@@ -316,9 +344,23 @@ features_df = load_features()
 risk_df = load_risk_scores()
 monitoring_df = load_model_monitoring()
 
-page = st.sidebar.radio("Navigate", ["Executive Overview", "Portfolio Analytics", "Loan Explainability"], label_visibility="collapsed")
+NAV_ITEMS = [
+    ("overview", "Executive Overview", ICON_OVERVIEW),
+    ("analytics", "Portfolio Analytics", ICON_ANALYTICS),
+    ("explain", "Loan Explainability", ICON_EXPLAIN),
+]
 
-if page == "Executive Overview":
+current_page = st.query_params.get("page", "overview")
+
+nav_html = ""
+for key, label, icon in NAV_ITEMS:
+    css_class = "nav-link nav-link-active" if key == current_page else "nav-link"
+    nav_html += f'<a href="?page={key}" target="_self" class="{css_class}">{icon}<span>{label}</span></a>'
+st.sidebar.markdown(nav_html, unsafe_allow_html=True)
+
+page = current_page
+
+if page == "overview":
     st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
     st.title("Executive Overview")
 
@@ -353,7 +395,7 @@ if page == "Executive Overview":
         st.altair_chart(chart, use_container_width=True)
     panel_close()
 
-elif page == "Portfolio Analytics":
+elif page == "analytics":
     st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
     st.title("Portfolio Analytics")
 
