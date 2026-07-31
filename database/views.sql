@@ -1,9 +1,7 @@
 USE credit_risk_platform;
 
--- ------------------------------------------------------------
--- View 1: loan_base_features
--- Joins the three core tables and computes simple ratio features.
--- ------------------------------------------------------------
+-- loan_base_features
+
 CREATE OR REPLACE VIEW loan_base_features AS
 SELECT
     l.loan_id,
@@ -30,11 +28,9 @@ JOIN customers c ON l.customer_id = c.customer_id
 LEFT JOIN repayments r ON l.loan_id = r.loan_id;
 
 
--- ------------------------------------------------------------
--- View 2: loan_peer_benchmark_features
--- Window functions comparing each loan to its peers —
--- by grade, region, and issue month.
--- ------------------------------------------------------------
+
+--  loan_peer_benchmark_features
+
 CREATE OR REPLACE VIEW loan_peer_benchmark_features AS
 SELECT
     loan_id,
@@ -68,12 +64,9 @@ SELECT
 FROM loan_base_features;
 
 
--- ------------------------------------------------------------
--- View 3: monthly_default_trend
--- CTE + window function showing default rate trend over time —
--- the "temporal thinking" feature, built from issue_date since
--- true repayment-over-time history isn't available.
--- ------------------------------------------------------------
+
+-- monthly_default_trend
+
 CREATE OR REPLACE VIEW monthly_default_trend AS
 WITH monthly_stats AS (
     SELECT
@@ -90,7 +83,7 @@ SELECT
     loans_issued,
     loans_defaulted,
     monthly_default_rate,
-    -- 3-month rolling average default rate (trend smoothing)
+    -- 3-month rolling average default rate
     AVG(monthly_default_rate) OVER (
         ORDER BY issue_month
         ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
@@ -98,12 +91,8 @@ SELECT
 FROM monthly_stats
 ORDER BY issue_month;
 
+-- final_model_features
 
--- ------------------------------------------------------------
--- View 4: final_model_features
--- The single view Python will pull from on Day 3 — combines
--- all engineered features into one flat table per loan.
--- ------------------------------------------------------------
 CREATE OR REPLACE VIEW final_model_features AS
 SELECT
     b.loan_id,
@@ -127,10 +116,7 @@ FROM loan_base_features b
 JOIN loan_peer_benchmark_features p ON b.loan_id = p.loan_id;
 
 
--- ------------------------------------------------------------
--- Example standalone analytical queries (for your README /
--- to show interview-ready SQL, not just views)
--- ------------------------------------------------------------
+
 
 -- Q1: Which purpose categories have the highest default rate,
 -- among purposes with meaningful volume (>500 loans)?

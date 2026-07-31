@@ -1,15 +1,9 @@
--- ============================================================
--- Credit Risk Early-Warning Platform — Schema
--- Day 1: Normalized core tables
--- ============================================================
-
 CREATE DATABASE IF NOT EXISTS credit_risk_platform;
 USE credit_risk_platform;
 
--- ------------------------------------------------------------
--- 1. customers
--- One row per borrower. Demographic / financial profile.
--- ------------------------------------------------------------
+
+--  customers
+
 CREATE TABLE customers (
     customer_id         INT PRIMARY KEY AUTO_INCREMENT,
     age                  INT,
@@ -21,10 +15,8 @@ CREATE TABLE customers (
     created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ------------------------------------------------------------
--- 2. loans
--- One row per loan. Core loan attributes + outcome label.
--- ------------------------------------------------------------
+--  loans
+
 CREATE TABLE loans (
     loan_id              INT PRIMARY KEY AUTO_INCREMENT,
     customer_id          INT NOT NULL,
@@ -41,10 +33,9 @@ CREATE TABLE loans (
         ON DELETE CASCADE
 );
 
--- ------------------------------------------------------------
--- 3. repayments
--- One row per repayment event. Used to build trend/behaviour features.
--- ------------------------------------------------------------
+
+--  repayments
+
 CREATE TABLE repayments (
     repayment_id         INT PRIMARY KEY AUTO_INCREMENT,
     loan_id              INT NOT NULL,
@@ -56,11 +47,9 @@ CREATE TABLE repayments (
         ON DELETE CASCADE
 );
 
--- ------------------------------------------------------------
--- 4. risk_scores
--- Output of the model + the decision/recommendation layer.
--- One row per loan per scoring run (model_version allows history).
--- ------------------------------------------------------------
+
+--  risk_scores
+
 CREATE TABLE risk_scores (
     score_id             INT PRIMARY KEY AUTO_INCREMENT,
     loan_id              INT NOT NULL,
@@ -73,10 +62,8 @@ CREATE TABLE risk_scores (
         ON DELETE CASCADE
 );
 
--- ------------------------------------------------------------
--- 5. model_monitoring
--- One row per trained model version. Tracks performance over time.
--- ------------------------------------------------------------
+
+
 CREATE TABLE model_monitoring (
     model_version        VARCHAR(20) PRIMARY KEY,
     trained_date         DATE,
@@ -87,10 +74,9 @@ CREATE TABLE model_monitoring (
     notes                VARCHAR(255)
 );
 
--- ------------------------------------------------------------
--- Indexes (added deliberately, not by default —
--- these are the ones you'll benchmark on Day 2)
--- ------------------------------------------------------------
+
+-- Indexes
+
 CREATE INDEX idx_loans_customer_id ON loans(customer_id);
 CREATE INDEX idx_loans_issue_date ON loans(issue_date);
 CREATE INDEX idx_repayments_loan_id ON repayments(loan_id);
