@@ -4,18 +4,18 @@ import numpy as np
 import joblib
 import shap
 import altair as alt
-from sqlalchemy import create_engine
 import os
 from dotenv import load_dotenv
+from sqlalchemy import create_engine
 
 load_dotenv()
 
-st.set_page_config(page_title="Credit Risk Decision Intelligence Platform", layout="wide", page_icon="◆")
+st.set_page_config(page_title="Credit Risk Intelligence Platform", layout="wide", page_icon="◆")
 
-DB_USER = "root"
-DB_PASSWORD = os.getenv("DB_PASSWORD")  
-DB_HOST = "localhost"
-DB_NAME = "credit_risk_platform"
+DB_USER = os.getenv("DB_USER", "root")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_NAME = os.getenv("DB_NAME", "credit_risk_platform")
 
 engine = create_engine(f"mysql+mysqlconnector://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}")
 
@@ -97,6 +97,7 @@ def inject_css():
     .brand-name {
         font-family: 'IBM Plex Sans', sans-serif;
         font-size: 11.5px;
+        line-height: 1.5;
         color: var(--muted);
         margin-bottom: 18px;
     }
@@ -262,12 +263,14 @@ ICON_ANALYTICS = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" 
 
 ICON_EXPLAIN = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="6"/><path d="M15 15 L20 20"/></svg>"""
 
+ICON_MONITOR = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 13 L8 13 L10 7 L13 18 L15 13 L20 13"/></svg>"""
+
 
 def render_sidebar_brand():
     st.sidebar.markdown(f"""
     <div class="brand-row">{COIN_ICON}<span class="brand-wordmark">CRIP</span></div>
     <div class="brand-full">Credit Risk Intelligence Platform</div>
-    <div class="brand-name">Nurmuhammad Nazmi</div>
+    <div class="brand-name">Built by Nurmuhammad Nazmi<br>Data Science Portfolio Project</div>
     <div class="brand-divider"></div>
     """, unsafe_allow_html=True)
 
@@ -348,6 +351,7 @@ NAV_ITEMS = [
     ("overview", "Executive Overview", ICON_OVERVIEW),
     ("analytics", "Portfolio Analytics", ICON_ANALYTICS),
     ("explain", "Loan Explainability", ICON_EXPLAIN),
+    ("monitoring", "Model Monitoring", ICON_MONITOR),
 ]
 
 current_page = st.query_params.get("page", "overview")
@@ -361,7 +365,7 @@ st.sidebar.markdown(nav_html, unsafe_allow_html=True)
 page = current_page
 
 if page == "overview":
-    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">Credit Risk Intelligence Platform</div>', unsafe_allow_html=True)
     st.title("Executive Overview")
 
     total_loans = len(features_df)
@@ -376,14 +380,17 @@ if page == "overview":
         ("Manual Review", f"{manual_review_count:,}"),
     ])
 
-    if not monitoring_df.empty:
-        latest = monitoring_df.sort_values("trained_date").iloc[-1]
-        st.markdown('<div class="eyebrow">Current Model — v' + str(latest["model_version"]) + '</div>', unsafe_allow_html=True)
+    if not risk_df.empty:
+        merged_exposure = risk_df.merge(features_df[["loan_id", "loan_amount", "default_flag"]], on="loan_id")
+        high_risk = merged_exposure[merged_exposure["recommended_action"] == "Manual review"]
+        exposure_amount = high_risk["loan_amount"].sum()
+        expected_default_rate = high_risk["default_flag"].mean() if len(high_risk) > 0 else 0
+
+        st.markdown('<div class="eyebrow">High Risk Portfolio Exposure</div>', unsafe_allow_html=True)
         kpi_row([
-            ("Accuracy", f"{latest['accuracy']:.1%}"),
-            ("Precision", f"{latest['precision_score']:.1%}"),
-            ("Recall", f"{latest['recall_score']:.1%}"),
-            ("ROC-AUC", f"{latest['roc_auc']:.3f}"),
+            ("Manual Review Loans", f"{len(high_risk):,}"),
+            ("Exposure Amount", f"${exposure_amount:,.0f}"),
+            ("Expected Default Rate", f"{expected_default_rate:.1%}"),
         ])
 
     panel_open("Does the risk tiering actually work?", "Default rate should climb as recommended action gets more severe — this is the real test of the system.")
@@ -395,23 +402,60 @@ if page == "overview":
         st.altair_chart(chart, use_container_width=True)
     panel_close()
 
+    n_defaults = int(features_df["default_flag"].sum())
+    panel_open("What this actually does for a lending business")
+    st.markdown(f"""
+    - Flags **{manual_review_count:,} loans** for manual review out of {total_loans:,} in the portfolio
+    - Learned from **{n_defaults:,} historical defaults**, not a synthetic or assumed pattern
+    - Default rate climbs monotonically across every tier (see chart above) — the tiering isn't arbitrary
+    - Shifts risk assessment from purely reactive (after a default happens) to proactive (before it happens)
+    """)
+    panel_close()
+
 elif page == "analytics":
-    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">Credit Risk Intelligence Platform</div>', unsafe_allow_html=True)
     st.title("Portfolio Analytics")
+
+    merged_df = features_df.merge(
+        risk_df[["loan_id", "recommended_action"]], on="loan_id", how="left"
+    )
+
+    panel_open("Filter portfolio")
+    f1, f2, f3, f4 = st.columns(4)
+    grade_filter = f1.selectbox("Grade", ["All"] + sorted(merged_df["grade"].unique().tolist()))
+    purpose_filter = f2.selectbox("Purpose", ["All"] + sorted(merged_df["purpose"].unique().tolist()))
+    tier_filter = f3.selectbox("Risk Tier", ["All"] + TIER_ORDER)
+    default_filter = f4.selectbox("Default Status", ["All", "Defaulted", "Did not default"])
+    panel_close()
+
+    filtered = merged_df.copy()
+    if grade_filter != "All":
+        filtered = filtered[filtered["grade"] == grade_filter]
+    if purpose_filter != "All":
+        filtered = filtered[filtered["purpose"] == purpose_filter]
+    if tier_filter != "All":
+        filtered = filtered[filtered["recommended_action"] == tier_filter]
+    if default_filter == "Defaulted":
+        filtered = filtered[filtered["default_flag"] == 1]
+    elif default_filter == "Did not default":
+        filtered = filtered[filtered["default_flag"] == 0]
+
+    st.caption(f"Showing {len(filtered):,} of {len(merged_df):,} loans")
 
     col1, col2 = st.columns(2)
 
     with col1:
         panel_open("Default Rate by Grade")
-        grade_stats = features_df.groupby("grade")["default_flag"].mean().reset_index()
+        grade_stats = filtered.groupby("grade")["default_flag"].mean().reset_index()
         grade_stats.columns = ["grade", "default_rate"]
         st.altair_chart(styled_bar_chart(grade_stats, "grade", "default_rate"), use_container_width=True)
         panel_close()
 
     with col2:
         panel_open("Risk Score Distribution")
-        if not risk_df.empty:
-            hist = alt.Chart(risk_df).mark_bar(color="#C9A24B", size=6).encode(
+        filtered_scores = risk_df[risk_df["loan_id"].isin(filtered["loan_id"])]
+        if not filtered_scores.empty:
+            hist = alt.Chart(filtered_scores).mark_bar(color="#C9A24B", size=6).encode(
                 x=alt.X("risk_score:Q", bin=alt.Bin(maxbins=30), axis=alt.Axis(labelColor="#8B96AC", titleColor="#8B96AC", domainColor="#26314A", tickColor="#26314A")),
                 y=alt.Y("count():Q", axis=alt.Axis(labelColor="#8B96AC", titleColor="#8B96AC", domainColor="#26314A", tickColor="#26314A", gridColor="#182036")),
             ).properties(height=260, background="transparent").configure_view(strokeWidth=0)
@@ -422,16 +466,15 @@ elif page == "analytics":
 
     with col3:
         panel_open("Risk Tier Breakdown")
-        if not risk_df.empty:
-            tier_counts = risk_df["recommended_action"].value_counts().reindex(TIER_ORDER).reset_index()
-            tier_counts.columns = ["tier", "count"]
-            st.altair_chart(styled_bar_chart(tier_counts, "tier", "count", color_map=TIER_COLORS), use_container_width=True)
+        tier_counts = filtered["recommended_action"].value_counts().reindex(TIER_ORDER).reset_index()
+        tier_counts.columns = ["tier", "count"]
+        st.altair_chart(styled_bar_chart(tier_counts, "tier", "count", color_map=TIER_COLORS), use_container_width=True)
         panel_close()
 
     with col4:
         panel_open("Default Rate by Loan Purpose", "Purposes with fewer than 300 loans excluded to avoid noise.")
         purpose_stats = (
-            features_df.groupby("purpose")["default_flag"]
+            filtered.groupby("purpose")["default_flag"]
             .agg(["mean", "count"])
             .query("count > 300")
             .sort_values("mean", ascending=False)
@@ -441,12 +484,12 @@ elif page == "analytics":
         st.altair_chart(styled_bar_chart(purpose_stats, "purpose", "default_rate"), use_container_width=True)
         panel_close()
 
-    panel_open("Full feature table", "Searchable — click a column header to sort.")
-    st.dataframe(features_df, use_container_width=True)
+    panel_open("Filtered loan table", "Searchable — click a column header to sort.")
+    st.dataframe(filtered, width="stretch")
     panel_close()
 
-else:
-    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
+elif page == "explain":
+    st.markdown('<div class="eyebrow">Credit Risk Intelligence Platform</div>', unsafe_allow_html=True)
     st.title("Loan Explainability")
     st.caption("Look up any loan to see its risk score and what's actually driving it.")
 
@@ -492,7 +535,25 @@ else:
     )
 
     st.write("")
-    panel_open("What's driving this score", "SHAP values computed live for this loan, using the same trained model.")
+    panel_open("Why was this loan classified as high risk?", "Computed live for this loan, using the same trained model.")
+
+    FEATURE_LABELS = {
+        "loan to income ratio": "Loan amount compared with income",
+        "had delinquency": "Previous payment delinquency",
+        "grade default rate": "Historical risk of borrower's credit grade",
+        "region default rate": "Historical risk of borrower's region",
+        "interest rate percentile in grade": "Interest rate compared with similar borrowers",
+        "loan amount rank in grade": "Loan size compared with similar borrowers",
+        "loan amount": "Loan amount",
+        "interest rate": "Interest rate",
+        "term months": "Loan term length",
+        "dti": "Debt-to-income ratio",
+        "annual income": "Annual income",
+        "employment length": "Length of employment",
+        "grade": "Credit grade",
+        "home ownership": "Home ownership status",
+        "purpose": "Stated loan purpose",
+    }
 
     X_transformed = preprocessor.transform(X_row)
     feature_names = preprocessor.get_feature_names_out()
@@ -507,7 +568,12 @@ else:
         pct = (abs(val) / max_abs) * 100
         color = "#C1543C" if val > 0 else "#4C8B6C"
         direction = "Increases risk" if val > 0 else "Decreases risk"
-        clean_name = feature_names[i].replace("num__", "").replace("cat__", "").replace("_", " ")
+        raw_name = feature_names[i].replace("num__", "").replace("cat__", "").replace("_", " ")
+        # try matching the base feature name for categorical columns like "grade_A" -> "grade"
+        clean_name = FEATURE_LABELS.get(raw_name)
+        if clean_name is None:
+            base_key = next((k for k in FEATURE_LABELS if raw_name.startswith(k)), None)
+            clean_name = FEATURE_LABELS.get(base_key, raw_name)
         rows_html += f"""
         <div class="driver-row">
             <div class="driver-name">{clean_name}</div>
@@ -517,3 +583,37 @@ else:
         """
     st.markdown(rows_html, unsafe_allow_html=True)
     panel_close()
+
+else:
+    st.markdown('<div class="eyebrow">Credit Risk Intelligence Platform</div>', unsafe_allow_html=True)
+    st.title("Model Monitoring")
+    st.caption("Performance history for every model version that's been trained and deployed.")
+
+    if monitoring_df.empty:
+        st.write("No model runs logged yet.")
+    else:
+        latest = monitoring_df.sort_values("trained_date").iloc[-1]
+
+        panel_open(f"Model {latest['model_version']}", f"Trained {latest['trained_date']} · Status: Active")
+        kpi_row([
+            ("ROC-AUC", f"{latest['roc_auc']:.3f}"),
+            ("Accuracy", f"{latest['accuracy']:.1%}"),
+            ("Precision", f"{latest['precision_score']:.1%}"),
+            ("Default Detection Recall", f"{latest['recall_score']:.1%}"),
+        ])
+        st.caption(latest["notes"])
+        panel_close()
+
+        panel_open("Full training history", "Every model version logged to model_monitoring.")
+        st.dataframe(monitoring_df.sort_values("trained_date", ascending=False), width="stretch")
+        panel_close()
+
+        panel_open("Model limitations")
+        st.markdown("""
+        - Trained on historical Lending Club data only — no real-time borrower transaction or behavioral data
+        - Risk tier thresholds (25 / 50 / 75) are business rules set by judgement, not statistically derived cutoffs, and would need calibration against a bank's actual risk appetite before real use
+        - `employment_length` and other self-reported fields carry the reporting gaps of the original dataset
+        - Precision on defaults is intentionally traded for recall, since this is designed as an early-warning system — it will over-flag loans for review rather than risk missing real defaults
+        - Performance should be re-evaluated periodically as new data comes in, not treated as fixed after one training run
+        """)
+        panel_close()
