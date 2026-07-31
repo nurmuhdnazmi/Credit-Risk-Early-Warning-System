@@ -5,11 +5,17 @@ import joblib
 import shap
 import altair as alt
 from sqlalchemy import create_engine
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
 
 st.set_page_config(page_title="Credit Risk Decision Intelligence Platform", layout="wide", page_icon="◆")
 
 DB_USER = "root"
-DB_PASSWORD = "***REDACTED-ROTATED***" 
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = "localhost"
 DB_NAME = "credit_risk_platform"
 

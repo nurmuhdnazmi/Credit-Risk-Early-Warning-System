@@ -1,18 +1,7 @@
-# Python
 __pycache__/
 *.pyc
-
-# Virtual environment
 .venv/
-
-# Environment variables
 .env
-
-# Dataset
 archive/*.csv
-
-# Model files
 models/*.joblib
-
-# Mac files
 .DS_Store

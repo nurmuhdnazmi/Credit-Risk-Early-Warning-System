@@ -12,11 +12,14 @@ from sklearn.metrics import (
 from xgboost import XGBClassifier
 import joblib
 import os
+from dotenv import load_dotenv
 
+
+load_dotenv()
 
 # CONFIG
 DB_USER = "root"
-DB_PASSWORD = "***REDACTED-ROTATED***"
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = "localhost"
 DB_NAME = "credit_risk_platform"
 MODEL_VERSION = "v1"

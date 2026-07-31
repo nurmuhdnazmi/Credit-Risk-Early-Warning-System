@@ -3,13 +3,17 @@ import numpy as np
 import joblib
 import shap
 import matplotlib.pyplot as plt
+import os
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score
 from datetime import date
 
+load_dotenv()
+
 # CONFIG
 DB_USER = "root"
-DB_PASSWORD = "***REDACTED-ROTATED***"
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = "localhost"
 DB_NAME = "credit_risk_platform"
 MODEL_VERSION = "v1"
