@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 
 load_dotenv()
 
-st.set_page_config(page_title="Credit Risk Intelligence Platform", layout="wide", page_icon="◆")
+st.set_page_config(page_title="Credit Risk Decision Intelligence Platform", layout="wide", page_icon="◆")
 
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
@@ -333,11 +333,13 @@ def load_model_monitoring():
 
 @st.cache_resource
 def load_model_and_explainer():
-    pipeline = joblib.load("../models/xgb_model_v1.joblib")
+    saved_model = joblib.load("../models/xgb_model_v1.joblib")
+    pipeline = saved_model["pipeline"]  # raw preprocess+model, needed for SHAP
+    calibrated_model = saved_model["calibrated_model"]  # source of every probability shown
     model = pipeline.named_steps["model"]
     preprocessor = pipeline.named_steps["preprocess"]
     explainer = shap.TreeExplainer(model)
-    return pipeline, preprocessor, explainer
+    return pipeline, preprocessor, explainer, calibrated_model
 
 
 inject_css()
@@ -365,7 +367,7 @@ st.sidebar.markdown(nav_html, unsafe_allow_html=True)
 page = current_page
 
 if page == "overview":
-    st.markdown('<div class="eyebrow">Credit Risk Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
     st.title("Executive Overview")
 
     total_loans = len(features_df)
@@ -413,7 +415,7 @@ if page == "overview":
     panel_close()
 
 elif page == "analytics":
-    st.markdown('<div class="eyebrow">Credit Risk Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
     st.title("Portfolio Analytics")
 
     merged_df = features_df.merge(
@@ -489,7 +491,7 @@ elif page == "analytics":
     panel_close()
 
 elif page == "explain":
-    st.markdown('<div class="eyebrow">Credit Risk Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
     st.title("Loan Explainability")
     st.caption("Look up any loan to see its risk score and what's actually driving it.")
 
@@ -498,7 +500,7 @@ elif page == "explain":
 
     row = features_df[features_df["loan_id"] == selected_id].iloc[0]
 
-    pipeline, preprocessor, explainer = load_model_and_explainer()
+    pipeline, preprocessor, explainer, calibrated_model = load_model_and_explainer()
 
     numeric_features = [
         "loan_amount", "interest_rate", "term_months", "dti",
@@ -509,7 +511,7 @@ elif page == "explain":
     categorical_features = ["grade", "home_ownership", "purpose"]
     X_row = pd.DataFrame([row[numeric_features + categorical_features]])
 
-    probs = pipeline.predict_proba(X_row)[:, 1][0]
+    probs = calibrated_model.predict_proba(X_row)[:, 1][0]
     risk_score = round(probs * 100, 1)
 
     if risk_score >= 75:
@@ -529,14 +531,6 @@ elif page == "explain":
         ("Actual Outcome", outcome),
     ])
 
-    st.markdown(
-        f'<div class="tier-badge" style="color:{badge_color}; border-color:{badge_color};">{action}</div>',
-        unsafe_allow_html=True,
-    )
-
-    st.write("")
-    panel_open("Why was this loan classified as high risk?", "Computed live for this loan, using the same trained model.")
-
     FEATURE_LABELS = {
         "loan to income ratio": "Loan amount compared with income",
         "had delinquency": "Previous payment delinquency",
@@ -555,11 +549,43 @@ elif page == "explain":
         "purpose": "Stated loan purpose",
     }
 
+    def clean_feature_name(raw_name):
+        label = FEATURE_LABELS.get(raw_name)
+        if label is None:
+            base_key = next((k for k in FEATURE_LABELS if raw_name.startswith(k)), None)
+            label = FEATURE_LABELS.get(base_key, raw_name)
+        return label
+
     X_transformed = preprocessor.transform(X_row)
     feature_names = preprocessor.get_feature_names_out()
     shap_values = explainer.shap_values(X_transformed)[0]
 
-    top_idx = np.argsort(np.abs(shap_values))[::-1][:5]
+    top_idx_all = np.argsort(np.abs(shap_values))[::-1]
+    # only the reasons pushing risk UP belong in "why this was flagged" —
+    # a protective factor isn't a reason for the recommendation
+    risk_increasing_idx = [i for i in top_idx_all if shap_values[i] > 0][:3]
+
+    reason_html = ""
+    for i in risk_increasing_idx:
+        raw_name = feature_names[i].replace("num__", "").replace("cat__", "").replace("_", " ")
+        reason_html += f"<li>{clean_feature_name(raw_name)}</li>"
+    if not reason_html:
+        reason_html = "<li>No single factor stands out — risk is driven by a broad combination of smaller signals</li>"
+
+    st.write("")
+    panel_open("Recommended Action")
+    st.markdown(f"""
+    <div class="tier-badge" style="color:{badge_color}; border-color:{badge_color}; font-size:14px; padding:7px 16px;">{action}</div>
+    <div style="margin-top:14px; font-family:'IBM Plex Sans', sans-serif; font-size:13px; color:var(--muted);">Reason</div>
+    <ul style="margin-top:6px; padding-left:18px; font-family:'IBM Plex Sans', sans-serif; font-size:14px; color:var(--text);">
+        {reason_html}
+    </ul>
+    """, unsafe_allow_html=True)
+    panel_close()
+
+    panel_open("Full driver breakdown", "Every top factor computed live for this loan, using the same trained model.")
+
+    top_idx = top_idx_all[:5]
     max_abs = max(abs(shap_values[i]) for i in top_idx)
 
     rows_html = ""
@@ -569,11 +595,7 @@ elif page == "explain":
         color = "#C1543C" if val > 0 else "#4C8B6C"
         direction = "Increases risk" if val > 0 else "Decreases risk"
         raw_name = feature_names[i].replace("num__", "").replace("cat__", "").replace("_", " ")
-        # try matching the base feature name for categorical columns like "grade_A" -> "grade"
-        clean_name = FEATURE_LABELS.get(raw_name)
-        if clean_name is None:
-            base_key = next((k for k in FEATURE_LABELS if raw_name.startswith(k)), None)
-            clean_name = FEATURE_LABELS.get(base_key, raw_name)
+        clean_name = clean_feature_name(raw_name)
         rows_html += f"""
         <div class="driver-row">
             <div class="driver-name">{clean_name}</div>
@@ -585,7 +607,7 @@ elif page == "explain":
     panel_close()
 
 else:
-    st.markdown('<div class="eyebrow">Credit Risk Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
     st.title("Model Monitoring")
     st.caption("Performance history for every model version that's been trained and deployed.")
 
@@ -603,6 +625,18 @@ else:
         ])
         st.caption(latest["notes"])
         panel_close()
+
+        with st.expander("About this model"):
+            pipeline, _, _, _ = load_model_and_explainer()
+            model = pipeline.named_steps["model"]
+            n_records = len(features_df)
+            st.markdown(f"""
+            - **Algorithm:** XGBoost classifier ({model.n_estimators} trees, max depth {model.max_depth})
+            - **Training records:** {n_records:,} loans (Lending Club, resolved outcomes only)
+            - **ROC-AUC:** {latest['roc_auc']:.3f}
+            - **Risk tier thresholds:** Standard < 25, Increase 25–50, Reduce 50–75, Manual review ≥ 75
+            - **Last trained:** {latest['trained_date']}
+            """)
 
         panel_open("Full training history", "Every model version logged to model_monitoring.")
         st.dataframe(monitoring_df.sort_values("trained_date", ascending=False), width="stretch")
