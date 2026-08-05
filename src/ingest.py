@@ -11,16 +11,20 @@ Prereqs:
     pip install pandas sqlalchemy mysql-connector-python
 """
  
+import os
 import pandas as pd
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
- 
+
+load_dotenv()
+
 # ------------------------------------------------------------
 # 1. CONFIG — edit these for your local setup
 # ------------------------------------------------------------
-DB_USER = "root"
-DB_PASSWORD = "***REDACTED-ROTATED***"          # <-- edit
-DB_HOST = "localhost"
-DB_NAME = "credit_risk_platform"
+DB_USER = os.getenv("DB_USER", "root")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_NAME = os.getenv("DB_NAME", "credit_risk_platform")
  
 RAW_CSV_PATH = "archive/loan.csv"      # <-- confirm path matches your machine
 SAMPLE_SIZE = 75000
