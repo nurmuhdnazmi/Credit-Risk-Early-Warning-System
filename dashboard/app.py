@@ -17,6 +17,10 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_NAME = os.getenv("DB_NAME", "credit_risk_platform")
 
+# Matches the flat LGD assumption used in explain_and_score.py, so live
+# expected-loss figures for loans outside the scored test set stay consistent.
+LGD_ASSUMPTION = 0.45
+
 engine = create_engine(f"mysql+mysqlconnector://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}")
 
 
@@ -383,6 +387,16 @@ if page == "overview":
     ])
 
     if not risk_df.empty:
+        total_expected_loss = risk_df["expected_loss"].sum()
+        el_by_tier = risk_df.groupby("recommended_action")["expected_loss"].sum().reindex(TIER_ORDER).fillna(0)
+
+        st.markdown('<div class="eyebrow">Portfolio Expected Loss</div>', unsafe_allow_html=True)
+        kpi_row(
+            [("Total Expected Loss", f"${total_expected_loss:,.0f}")]
+            + [(tier, f"${el_by_tier[tier]:,.0f}") for tier in TIER_ORDER]
+        )
+
+    if not risk_df.empty:
         merged_exposure = risk_df.merge(features_df[["loan_id", "loan_amount", "default_flag"]], on="loan_id")
         high_risk = merged_exposure[merged_exposure["recommended_action"] == "Manual review"]
         exposure_amount = high_risk["loan_amount"].sum()
@@ -513,6 +527,7 @@ elif page == "explain":
 
     probs = calibrated_model.predict_proba(X_row)[:, 1][0]
     risk_score = round(probs * 100, 1)
+    expected_loss = probs * LGD_ASSUMPTION * row["loan_amount"]
 
     if risk_score >= 75:
         action = "Manual review"
@@ -528,6 +543,8 @@ elif page == "explain":
 
     kpi_row([
         ("Risk Score", f"{risk_score}"),
+        ("Probability of Default", f"{probs:.1%}"),
+        ("Expected Loss", f"${expected_loss:,.0f}"),
         ("Actual Outcome", outcome),
     ])
 
@@ -637,6 +654,16 @@ else:
             - **Risk tier thresholds:** Standard < 25, Increase 25–50, Reduce 50–75, Manual review ≥ 75
             - **Last trained:** {latest['trained_date']}
             """)
+
+        panel_open("Calibration", "Does a 70% risk score actually mean ~70% of those loans default?")
+        st.image("../models/calibration_curve.png", width="stretch")
+        st.caption(
+            "Isotonic regression was fit on a held-out calibration split so predicted "
+            "probabilities track actual default rates, rather than just ranking loans "
+            "by relative risk. Points below the diagonal mean the model overstates risk "
+            "there; above means it understates it."
+        )
+        panel_close()
 
         panel_open("Full training history", "Every model version logged to model_monitoring.")
         st.dataframe(monitoring_df.sort_values("trained_date", ascending=False), width="stretch")
