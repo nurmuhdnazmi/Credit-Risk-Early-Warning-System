@@ -647,11 +647,21 @@ else:
             pipeline, _, _, _ = load_model_and_explainer()
             model = pipeline.named_steps["model"]
             n_records = len(features_df)
+            if not risk_df.empty:
+                p50, p80, p95 = np.percentile(risk_df["risk_score"], [50, 80, 95])
+                tier_line = (
+                    f"Percentile-based — Standard (bottom 50%, < {p50:.0f}), "
+                    f"Increase (50–80th pct, {p50:.0f}–{p80:.0f}), "
+                    f"Reduce (80–95th pct, {p80:.0f}–{p95:.0f}), "
+                    f"Manual review (top 5%, ≥ {p95:.0f})"
+                )
+            else:
+                tier_line = "Percentile-based — bottom 50% Standard, next 30% Increase, next 15% Reduce, top 5% Manual review"
             st.markdown(f"""
             - **Algorithm:** XGBoost classifier ({model.n_estimators} trees, max depth {model.max_depth})
             - **Training records:** {n_records:,} loans (Lending Club, resolved outcomes only)
             - **ROC-AUC:** {latest['roc_auc']:.3f}
-            - **Risk tier thresholds:** Standard < 25, Increase 25–50, Reduce 50–75, Manual review ≥ 75
+            - **Risk tier thresholds:** {tier_line}
             - **Last trained:** {latest['trained_date']}
             """)
 
@@ -672,7 +682,7 @@ else:
         panel_open("Model limitations")
         st.markdown("""
         - Trained on historical Lending Club data only — no real-time borrower transaction or behavioral data
-        - Risk tier thresholds (25 / 50 / 75) are business rules set by judgement, not statistically derived cutoffs, and would need calibration against a bank's actual risk appetite before real use
+        - Risk tier boundaries (P50 / P80 / P95) are percentile-based against the scored population, but what share of the portfolio each tier should cover is still a judgement call, not calibrated against a bank's actual risk appetite or manual-review capacity
         - `employment_length` and other self-reported fields carry the reporting gaps of the original dataset
         - Precision on defaults is intentionally traded for recall, since this is designed as an early-warning system — it will over-flag loans for review rather than risk missing real defaults
         - Performance should be re-evaluated periodically as new data comes in, not treated as fixed after one training run
