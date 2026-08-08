@@ -47,3 +47,17 @@ CROSS JOIN mob_buckets b
 JOIN vintage_loan_base v ON v.origination_quarter = t.origination_quarter
 GROUP BY t.origination_quarter, t.cohort_size, b.mob_bucket
 ORDER BY t.origination_quarter, b.mob_bucket;
+
+-- yearly_origination_quality
+-- Raw default rate by origination year, regardless of months-on-book.
+-- Used to separate underwriting-quality drift over time from the
+-- crisis-window comparison in vintage_analysis above.
+CREATE OR REPLACE VIEW yearly_origination_quality AS
+SELECT
+    YEAR(issue_date) AS origination_year,
+    COUNT(*) AS n_loans,
+    ROUND(AVG(default_flag), 4) AS default_rate
+FROM loans
+WHERE issue_date IS NOT NULL
+GROUP BY YEAR(issue_date)
+ORDER BY origination_year;

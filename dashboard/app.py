@@ -342,6 +342,11 @@ def load_vintage_analysis():
     return pd.read_sql("SELECT * FROM vintage_analysis", engine)
 
 
+@st.cache_data(ttl=300)
+def load_yearly_origination_quality():
+    return pd.read_sql("SELECT * FROM yearly_origination_quality", engine)
+
+
 @st.cache_resource
 def load_model_and_explainer():
     saved_model = joblib.load("../models/xgb_model_v1.joblib")
@@ -360,6 +365,7 @@ features_df = load_features()
 risk_df = load_risk_scores()
 monitoring_df = load_model_monitoring()
 vintage_df = load_vintage_analysis()
+yearly_quality_df = load_yearly_origination_quality()
 
 NAV_ITEMS = [
     ("overview", "Executive Overview", ICON_OVERVIEW),
@@ -738,29 +744,46 @@ else:
         noncrisis_rate = noncrisis_ref["cumulative_defaults"].sum() / noncrisis_n if noncrisis_n else 0
         relative_diff = (crisis_rate - noncrisis_rate) / noncrisis_rate if noncrisis_rate else 0
 
+        baseline_year = 2010
+        baseline_row = yearly_quality_df[yearly_quality_df["origination_year"] == baseline_year]
+        peak_row = yearly_quality_df.loc[yearly_quality_df["default_rate"].idxmax()]
+        peak_year = int(peak_row["origination_year"])
+        peak_rate = peak_row["default_rate"]
+        max_year = int(yearly_quality_df["origination_year"].max())
+        censored_years_label = f"{max_year - 2}–{max_year}"
+
         if relative_diff > 0.15:
             finding = (
                 f"the 2007–2009 vintages default at a visibly higher rate "
-                f"({crisis_rate:.1%} vs {noncrisis_rate:.1%} for every other cohort) — consistent with "
-                "borrowers underwritten through the financial crisis performing worse."
-            )
-        elif relative_diff < -0.15:
-            finding = (
-                f"the 2007–2009 vintages actually default at a lower rate "
-                f"({crisis_rate:.1%} vs {noncrisis_rate:.1%} for every other cohort) — no visible crisis "
-                "effect shows up in this sample."
+                f"({crisis_rate:.1%} vs {noncrisis_rate:.1%} for every other cohort) — a crisis effect "
+                "that holds up even against the broader growth-driven drift below."
             )
         else:
             finding = (
-                f"the 2007–2009 vintages sit close to the rest of the portfolio "
-                f"({crisis_rate:.1%} vs {noncrisis_rate:.1%} for every other cohort) — no clear, consistent "
-                "crisis-era deterioration shows up here."
+                f"the 2007–2009 vintages sit at {crisis_rate:.1%} vs {noncrisis_rate:.1%} for every "
+                "other cohort — too small a sample to detect a crisis effect, and overshadowed by a "
+                "stronger, growth-driven trend in underwriting quality over time."
+            )
+
+        if not baseline_row.empty:
+            baseline_rate = baseline_row["default_rate"].iloc[0]
+            drift_line = (
+                f"Raw default rate climbs from {baseline_rate:.1%} in {baseline_year} to a peak of "
+                f"{peak_rate:.1%} in {peak_year}, as origination volume scaled from a few hundred loans "
+                "a year to tens of thousands — that's the dominant pattern here, not the 2007–2009 window"
+            )
+        else:
+            drift_line = (
+                f"Raw default rate peaks at {peak_rate:.1%} in {peak_year}, as origination volume scaled "
+                "from a few hundred loans a year to tens of thousands — that's the dominant pattern here, "
+                "not the 2007–2009 window"
             )
 
         panel_open("Takeaway")
         st.markdown(f"""
         - Cumulative default rate climbs with months on book and levels off as each cohort finishes resolving — the shape of a normal vintage curve
-        - At the {reference_mob}-month mark, {finding}
-        - That comparison is thin: the 2007–2009 window covers only {crisis_n:,} loans across {crisis_df['origination_quarter'].nunique()} quarters, versus {noncrisis_n:,} loans for every other quarter combined — a couple of loans can swing a crisis-era quarter's rate, so treat any gap here as suggestive, not conclusive
+        - {drift_line}
+        - At the {reference_mob}-month mark, {finding} That comparison is also thin on data: the 2007–2009 window covers only {crisis_n:,} loans across {crisis_df['origination_quarter'].nunique()} quarters, versus {noncrisis_n:,} for every other quarter combined
+        - {censored_years_label} cohorts likely understate their eventual default rate: this dataset only keeps resolved loans, so recent vintages that haven't finished maturing are missing loans still marked "Current" that would go on to default — correcting for that right-censoring would make the drift trend look even steeper, not flatter
         """)
         panel_close()
