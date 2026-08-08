@@ -271,6 +271,8 @@ ICON_MONITOR = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" st
 
 ICON_VINTAGE = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 17 C7 17 7 9 11 9 C15 9 15 15 19 15"/><path d="M3 12 C7 12 7 6 11 6 C15 6 15 11 19 11" opacity="0.5"/></svg>"""
 
+ICON_STRESS = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 20 L7 20 L7 13 L11 13 L11 8 L15 8 L15 15 L19 15 L19 4"/></svg>"""
+
 
 def render_sidebar_brand():
     st.sidebar.markdown(f"""
@@ -347,6 +349,11 @@ def load_yearly_origination_quality():
     return pd.read_sql("SELECT * FROM yearly_origination_quality", engine)
 
 
+@st.cache_data(ttl=300)
+def load_stress_test_results():
+    return pd.read_sql("SELECT * FROM stress_test_results", engine)
+
+
 @st.cache_resource
 def load_model_and_explainer():
     saved_model = joblib.load("../models/xgb_model_v1.joblib")
@@ -366,6 +373,7 @@ risk_df = load_risk_scores()
 monitoring_df = load_model_monitoring()
 vintage_df = load_vintage_analysis()
 yearly_quality_df = load_yearly_origination_quality()
+stress_df = load_stress_test_results()
 
 NAV_ITEMS = [
     ("overview", "Executive Overview", ICON_OVERVIEW),
@@ -373,6 +381,7 @@ NAV_ITEMS = [
     ("explain", "Loan Explainability", ICON_EXPLAIN),
     ("monitoring", "Model Monitoring", ICON_MONITOR),
     ("vintage", "Vintage Analysis", ICON_VINTAGE),
+    ("stress", "Stress Testing", ICON_STRESS),
 ]
 
 current_page = st.query_params.get("page", "overview")
@@ -704,7 +713,7 @@ elif page == "monitoring":
         """)
         panel_close()
 
-else:
+elif page == "vintage":
     st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
     st.title("Vintage Analysis")
     st.caption("Cumulative default rate by months on book, one curve per loan-origination quarter.")
@@ -785,5 +794,59 @@ else:
         - {drift_line}
         - At the {reference_mob}-month mark, {finding} That comparison is also thin on data: the 2007–2009 window covers only {crisis_n:,} loans across {crisis_df['origination_quarter'].nunique()} quarters, versus {noncrisis_n:,} for every other quarter combined
         - {censored_years_label} cohorts likely understate their eventual default rate: this dataset only keeps resolved loans, so recent vintages that haven't finished maturing are missing loans still marked "Current" that would go on to default — correcting for that right-censoring would make the drift trend look even steeper, not flatter
+        """)
+        panel_close()
+
+else:
+    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
+    st.title("Stress Testing")
+    st.caption("Portfolio Expected Loss under real Fed CCAR/DFAST unemployment scenarios.")
+
+    if stress_df.empty:
+        st.write("No stress test results available.")
+    else:
+        scenario_labels = {"baseline": "Baseline", "adverse": "Adverse", "severely_adverse": "Severely Adverse"}
+        scenario_order = ["baseline", "adverse", "severely_adverse"]
+        stress_indexed = stress_df.set_index("scenario")
+        fit_row = stress_df.iloc[0]
+
+        panel_open(
+            "Portfolio Expected Loss by scenario",
+            "Each scenario shifts every loan's calibrated PD by the fitted unemployment sensitivity, scaled by that loan's origination-year risk.",
+        )
+        kpi_row([
+            (scenario_labels[s], f"${stress_indexed.loc[s, 'portfolio_el']:,.0f}")
+            for s in scenario_order if s in stress_indexed.index
+        ])
+        panel_close()
+
+        if "baseline" in stress_indexed.index:
+            baseline_el = stress_indexed.loc["baseline", "portfolio_el"]
+            st.markdown('<div class="eyebrow">Increase vs Baseline</div>', unsafe_allow_html=True)
+            kpi_row([
+                (scenario_labels[s], f"+${stress_indexed.loc[s, 'portfolio_el'] - baseline_el:,.0f}")
+                for s in scenario_order if s in stress_indexed.index and s != "baseline"
+            ])
+
+        panel_open("Scenario sources", "Real Fed-published unemployment paths, not invented numbers.")
+        st.dataframe(
+            stress_df[["scenario", "unemployment_delta_pp", "scenario_source"]].rename(columns={
+                "scenario": "Scenario",
+                "unemployment_delta_pp": "Unemployment Δ (pp)",
+                "scenario_source": "Source",
+            }),
+            width="stretch",
+            hide_index=True,
+        )
+        panel_close()
+
+        panel_open("Methodology", "The sensitivity was fit from real historical data, not assumed.")
+        st.markdown(f"""
+        - Fitted on {fit_row['n_years_fitted']:.0f} annual origination cohorts (2007–2018) using unemployment rate (FRED series UNRATE) and origination year as predictors of cohort default rate — origination year controls for the underwriting-drift trend found in Vintage Analysis, since unemployment and origination volume both moved over that window and would otherwise be confounded
+        - The fitted unemployment coefficient is {fit_row['pd_sensitivity_slope']:.2f}pp default rate per 1pp unemployment (95% CI: {fit_row['sensitivity_ci_lower']:.2f} to {fit_row['sensitivity_ci_upper']:.2f}) — the CI spans zero, so this sample can't statistically distinguish the effect from zero, and the point estimate itself is slightly negative
+        - Applying that point estimate directly would imply a recession *reduces* portfolio risk, which isn't credible — so scenario shifts use {fit_row['applied_sensitivity_pp']:.2f}pp, the upper (most risk-conservative) bound of the same 95% CI, instead of the point estimate
+        - Each loan's shift is scaled by its origination year's baseline default rate relative to the portfolio average, so a 2016-vintage loan (above-average risk) moves more than a 2010-vintage loan (below-average) under the same macro shock
+        - Baseline and severely adverse unemployment paths are the Fed's actual published 2025 supervisory scenarios; adverse is sourced from 2019, the last year the Fed published a separate adverse tier before consolidating to baseline and severely adverse only
+        - With only {fit_row['n_years_fitted']:.0f} data points and 2 predictors, this fit has 9 degrees of freedom — treat the sensitivity as directional, not precise, and re-fit as more years of data accumulate
         """)
         panel_close()

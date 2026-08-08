@@ -17,6 +17,7 @@ scikit-learn==1.6.1
 scipy==1.13.1
 six==1.17.0
 SQLAlchemy==2.0.51
+statsmodels==0.14.6
 threadpoolctl==3.6.0
 typing_extensions==4.16.0
 tzdata==2026.3
