@@ -5,3 +5,4 @@ __pycache__/
 archive/*.csv
 models/*.joblib
 .DS_Store
+CLAUDE.md
