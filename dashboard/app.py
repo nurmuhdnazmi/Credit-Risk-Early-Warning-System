@@ -269,6 +269,8 @@ ICON_EXPLAIN = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" st
 
 ICON_MONITOR = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 13 L8 13 L10 7 L13 18 L15 13 L20 13"/></svg>"""
 
+ICON_VINTAGE = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 17 C7 17 7 9 11 9 C15 9 15 15 19 15"/><path d="M3 12 C7 12 7 6 11 6 C15 6 15 11 19 11" opacity="0.5"/></svg>"""
+
 
 def render_sidebar_brand():
     st.sidebar.markdown(f"""
@@ -335,6 +337,11 @@ def load_model_monitoring():
     return pd.read_sql("SELECT * FROM model_monitoring", engine)
 
 
+@st.cache_data(ttl=300)
+def load_vintage_analysis():
+    return pd.read_sql("SELECT * FROM vintage_analysis", engine)
+
+
 @st.cache_resource
 def load_model_and_explainer():
     saved_model = joblib.load("../models/xgb_model_v1.joblib")
@@ -352,12 +359,14 @@ render_sidebar_brand()
 features_df = load_features()
 risk_df = load_risk_scores()
 monitoring_df = load_model_monitoring()
+vintage_df = load_vintage_analysis()
 
 NAV_ITEMS = [
     ("overview", "Executive Overview", ICON_OVERVIEW),
     ("analytics", "Portfolio Analytics", ICON_ANALYTICS),
     ("explain", "Loan Explainability", ICON_EXPLAIN),
     ("monitoring", "Model Monitoring", ICON_MONITOR),
+    ("vintage", "Vintage Analysis", ICON_VINTAGE),
 ]
 
 current_page = st.query_params.get("page", "overview")
@@ -623,7 +632,7 @@ elif page == "explain":
     st.markdown(rows_html, unsafe_allow_html=True)
     panel_close()
 
-else:
+elif page == "monitoring":
     st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
     st.title("Model Monitoring")
     st.caption("Performance history for every model version that's been trained and deployed.")
@@ -686,5 +695,72 @@ else:
         - `employment_length` and other self-reported fields carry the reporting gaps of the original dataset
         - Precision on defaults is intentionally traded for recall, since this is designed as an early-warning system — it will over-flag loans for review rather than risk missing real defaults
         - Performance should be re-evaluated periodically as new data comes in, not treated as fixed after one training run
+        """)
+        panel_close()
+
+else:
+    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
+    st.title("Vintage Analysis")
+    st.caption("Cumulative default rate by months on book, one curve per loan-origination quarter.")
+
+    if vintage_df.empty:
+        st.write("No vintage data available.")
+    else:
+        crisis_df = vintage_df[vintage_df["is_crisis_vintage"] == 1]
+        noncrisis_df = vintage_df[vintage_df["is_crisis_vintage"] == 0]
+
+        panel_open(
+            "Vintage curves",
+            "Each line is one origination quarter. Gray lines are 2010–2018 cohorts; red lines are 2007–2009, the financial crisis window.",
+        )
+        base = alt.Chart(noncrisis_df).mark_line(strokeWidth=1, opacity=0.35).encode(
+            x=alt.X("mob_bucket:Q", title="Months on book", axis=alt.Axis(labelColor="#8B96AC", titleColor="#8B96AC", domainColor="#26314A", tickColor="#26314A")),
+            y=alt.Y("cumulative_default_rate:Q", title="Cumulative default rate", axis=alt.Axis(format=".0%", labelColor="#8B96AC", titleColor="#8B96AC", domainColor="#26314A", tickColor="#26314A", gridColor="#182036")),
+            detail="origination_quarter:N",
+            color=alt.value("#8B96AC"),
+        )
+        crisis = alt.Chart(crisis_df).mark_line(strokeWidth=2.2).encode(
+            x="mob_bucket:Q",
+            y="cumulative_default_rate:Q",
+            detail="origination_quarter:N",
+            color=alt.value("#C1543C"),
+        )
+        chart = (base + crisis).properties(height=380, background="transparent").configure_view(strokeWidth=0)
+        st.altair_chart(chart, use_container_width=True)
+        panel_close()
+
+        reference_mob = 36
+        crisis_ref = crisis_df[crisis_df["mob_bucket"] == reference_mob]
+        noncrisis_ref = noncrisis_df[noncrisis_df["mob_bucket"] == reference_mob]
+        crisis_n = crisis_ref["cohort_size"].sum()
+        noncrisis_n = noncrisis_ref["cohort_size"].sum()
+        crisis_rate = crisis_ref["cumulative_defaults"].sum() / crisis_n if crisis_n else 0
+        noncrisis_rate = noncrisis_ref["cumulative_defaults"].sum() / noncrisis_n if noncrisis_n else 0
+        relative_diff = (crisis_rate - noncrisis_rate) / noncrisis_rate if noncrisis_rate else 0
+
+        if relative_diff > 0.15:
+            finding = (
+                f"the 2007–2009 vintages default at a visibly higher rate "
+                f"({crisis_rate:.1%} vs {noncrisis_rate:.1%} for every other cohort) — consistent with "
+                "borrowers underwritten through the financial crisis performing worse."
+            )
+        elif relative_diff < -0.15:
+            finding = (
+                f"the 2007–2009 vintages actually default at a lower rate "
+                f"({crisis_rate:.1%} vs {noncrisis_rate:.1%} for every other cohort) — no visible crisis "
+                "effect shows up in this sample."
+            )
+        else:
+            finding = (
+                f"the 2007–2009 vintages sit close to the rest of the portfolio "
+                f"({crisis_rate:.1%} vs {noncrisis_rate:.1%} for every other cohort) — no clear, consistent "
+                "crisis-era deterioration shows up here."
+            )
+
+        panel_open("Takeaway")
+        st.markdown(f"""
+        - Cumulative default rate climbs with months on book and levels off as each cohort finishes resolving — the shape of a normal vintage curve
+        - At the {reference_mob}-month mark, {finding}
+        - That comparison is thin: the 2007–2009 window covers only {crisis_n:,} loans across {crisis_df['origination_quarter'].nunique()} quarters, versus {noncrisis_n:,} loans for every other quarter combined — a couple of loans can swing a crisis-era quarter's rate, so treat any gap here as suggestive, not conclusive
         """)
         panel_close()
