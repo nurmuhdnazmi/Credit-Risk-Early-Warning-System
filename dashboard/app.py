@@ -6,7 +6,7 @@ import shap
 import altair as alt
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 load_dotenv()
 
@@ -273,6 +273,8 @@ ICON_VINTAGE = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" st
 
 ICON_STRESS = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 20 L7 20 L7 13 L11 13 L11 8 L15 8 L15 15 L19 15 L19 4"/></svg>"""
 
+ICON_SIMULATOR = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M8 8 L16 8 M8 12 L11 12 M13.5 12 L16 12 M8 16 L11 16 M13.5 16 L16 16"/></svg>"""
+
 
 def render_sidebar_brand():
     st.sidebar.markdown(f"""
@@ -324,6 +326,119 @@ def styled_bar_chart(df, x_col, y_col, color_map=None, height=260):
     return base.properties(height=height, background="transparent").configure_view(strokeWidth=0)
 
 
+NUMERIC_FEATURES = [
+    "loan_amount", "interest_rate", "term_months", "dti",
+    "annual_income", "employment_length", "loan_to_income_ratio",
+    "had_delinquency", "interest_rate_percentile_in_grade",
+    "grade_default_rate", "region_default_rate", "loan_amount_rank_in_grade",
+]
+CATEGORICAL_FEATURES = ["grade", "home_ownership", "purpose"]
+
+FEATURE_LABELS = {
+    "loan to income ratio": "Loan amount compared with income",
+    "had delinquency": "Previous payment delinquency",
+    "grade default rate": "Historical risk of borrower's credit grade",
+    "region default rate": "Historical risk of borrower's region",
+    "interest rate percentile in grade": "Interest rate compared with similar borrowers",
+    "loan amount rank in grade": "Loan size compared with similar borrowers",
+    "loan amount": "Loan amount",
+    "interest rate": "Interest rate",
+    "term months": "Loan term length",
+    "dti": "Debt-to-income ratio",
+    "annual income": "Annual income",
+    "employment length": "Length of employment",
+    "grade": "Credit grade",
+    "home ownership": "Home ownership status",
+    "purpose": "Stated loan purpose",
+}
+
+
+def clean_feature_name(raw_name):
+    label = FEATURE_LABELS.get(raw_name)
+    if label is None:
+        base_key = next((k for k in FEATURE_LABELS if raw_name.startswith(k)), None)
+        label = FEATURE_LABELS.get(base_key, raw_name)
+    return label
+
+
+def render_scoring_result(X_row, loan_amount, actual_outcome=None):
+    pipeline, preprocessor, explainer, calibrated_model = load_model_and_explainer()
+
+    probs = calibrated_model.predict_proba(X_row)[:, 1][0]
+    risk_score = round(probs * 100, 1)
+    expected_loss = probs * LGD_ASSUMPTION * loan_amount
+
+    if risk_score >= 75:
+        action = "Manual review"
+    elif risk_score >= 50:
+        action = "Reduce credit limit"
+    elif risk_score >= 25:
+        action = "Increase monitoring"
+    else:
+        action = "Standard monitoring"
+
+    badge_color = TIER_COLORS[action]
+
+    kpi_items = [
+        ("Risk Score", f"{risk_score}"),
+        ("Probability of Default", f"{probs:.1%}"),
+        ("Expected Loss", f"${expected_loss:,.0f}"),
+    ]
+    if actual_outcome is not None:
+        kpi_items.append(("Actual Outcome", actual_outcome))
+    kpi_row(kpi_items)
+
+    X_transformed = preprocessor.transform(X_row)
+    feature_names = preprocessor.get_feature_names_out()
+    shap_values = explainer.shap_values(X_transformed)[0]
+
+    top_idx_all = np.argsort(np.abs(shap_values))[::-1]
+    # only the reasons pushing risk UP belong in "why this was flagged" —
+    # a protective factor isn't a reason for the recommendation
+    risk_increasing_idx = [i for i in top_idx_all if shap_values[i] > 0][:3]
+
+    reason_html = ""
+    for i in risk_increasing_idx:
+        raw_name = feature_names[i].replace("num__", "").replace("cat__", "").replace("_", " ")
+        reason_html += f"<li>{clean_feature_name(raw_name)}</li>"
+    if not reason_html:
+        reason_html = "<li>No single factor stands out — risk is driven by a broad combination of smaller signals</li>"
+
+    st.write("")
+    panel_open("Recommended Action")
+    st.markdown(f"""
+    <div class="tier-badge" style="color:{badge_color}; border-color:{badge_color}; font-size:14px; padding:7px 16px;">{action}</div>
+    <div style="margin-top:14px; font-family:'IBM Plex Sans', sans-serif; font-size:13px; color:var(--muted);">Reason</div>
+    <ul style="margin-top:6px; padding-left:18px; font-family:'IBM Plex Sans', sans-serif; font-size:14px; color:var(--text);">
+        {reason_html}
+    </ul>
+    """, unsafe_allow_html=True)
+    panel_close()
+
+    panel_open("Full driver breakdown", "Every top factor computed live for this loan, using the same trained model.")
+
+    top_idx = top_idx_all[:5]
+    max_abs = max(abs(shap_values[i]) for i in top_idx)
+
+    rows_html = ""
+    for i in top_idx:
+        val = shap_values[i]
+        pct = (abs(val) / max_abs) * 100
+        color = "#C1543C" if val > 0 else "#4C8B6C"
+        direction = "Increases risk" if val > 0 else "Decreases risk"
+        raw_name = feature_names[i].replace("num__", "").replace("cat__", "").replace("_", " ")
+        clean_name = clean_feature_name(raw_name)
+        rows_html += f"""
+        <div class="driver-row">
+            <div class="driver-name">{clean_name}</div>
+            <div class="driver-bar-track"><div class="driver-bar-fill" style="width:{pct}%; background:{color};"></div></div>
+            <div class="driver-dir" style="color:{color};">{direction}</div>
+        </div>
+        """
+    st.markdown(rows_html, unsafe_allow_html=True)
+    panel_close()
+
+
 @st.cache_data(ttl=300)
 def load_features():
     return pd.read_sql("SELECT * FROM final_model_features", engine)
@@ -354,6 +469,34 @@ def load_stress_test_results():
     return pd.read_sql("SELECT * FROM stress_test_results", engine)
 
 
+@st.cache_data(ttl=300)
+def load_portfolio_avg_default_rate():
+    return pd.read_sql("SELECT AVG(default_flag) AS rate FROM loans", engine)["rate"].iloc[0]
+
+
+@st.cache_data(ttl=300)
+def load_grade_rate_ranges():
+    return pd.read_sql(
+        "SELECT grade, MIN(interest_rate) AS min_rate, MAX(interest_rate) AS max_rate FROM loans GROUP BY grade",
+        engine,
+    ).set_index("grade")
+
+
+@st.cache_data(ttl=60)
+def compute_grade_benchmarks(grade, interest_rate, loan_amount):
+    query = text("""
+        SELECT
+            AVG(CASE WHEN interest_rate <= :interest_rate THEN 1.0 ELSE 0.0 END) AS interest_rate_percentile_in_grade,
+            AVG(default_flag) AS grade_default_rate,
+            SUM(CASE WHEN loan_amount > :loan_amount THEN 1 ELSE 0 END) + 1 AS loan_amount_rank_in_grade
+        FROM loans
+        WHERE grade = :grade
+    """)
+    with engine.connect() as conn:
+        row = conn.execute(query, {"interest_rate": interest_rate, "loan_amount": loan_amount, "grade": grade}).mappings().first()
+    return row
+
+
 @st.cache_resource
 def load_model_and_explainer():
     saved_model = joblib.load("../models/xgb_model_v1.joblib")
@@ -382,6 +525,7 @@ NAV_ITEMS = [
     ("monitoring", "Model Monitoring", ICON_MONITOR),
     ("vintage", "Vintage Analysis", ICON_VINTAGE),
     ("stress", "Stress Testing", ICON_STRESS),
+    ("simulator", "What-If Simulator", ICON_SIMULATOR),
 ]
 
 current_page = st.query_params.get("page", "overview")
@@ -537,115 +681,10 @@ elif page == "explain":
     selected_id = st.selectbox("Loan ID", loan_ids, label_visibility="collapsed")
 
     row = features_df[features_df["loan_id"] == selected_id].iloc[0]
-
-    pipeline, preprocessor, explainer, calibrated_model = load_model_and_explainer()
-
-    numeric_features = [
-        "loan_amount", "interest_rate", "term_months", "dti",
-        "annual_income", "employment_length", "loan_to_income_ratio",
-        "had_delinquency", "interest_rate_percentile_in_grade",
-        "grade_default_rate", "region_default_rate", "loan_amount_rank_in_grade",
-    ]
-    categorical_features = ["grade", "home_ownership", "purpose"]
-    X_row = pd.DataFrame([row[numeric_features + categorical_features]])
-
-    probs = calibrated_model.predict_proba(X_row)[:, 1][0]
-    risk_score = round(probs * 100, 1)
-    expected_loss = probs * LGD_ASSUMPTION * row["loan_amount"]
-
-    if risk_score >= 75:
-        action = "Manual review"
-    elif risk_score >= 50:
-        action = "Reduce credit limit"
-    elif risk_score >= 25:
-        action = "Increase monitoring"
-    else:
-        action = "Standard monitoring"
-
-    badge_color = TIER_COLORS[action]
+    X_row = pd.DataFrame([row[NUMERIC_FEATURES + CATEGORICAL_FEATURES]])
     outcome = "Defaulted" if row["default_flag"] == 1 else "Did not default"
 
-    kpi_row([
-        ("Risk Score", f"{risk_score}"),
-        ("Probability of Default", f"{probs:.1%}"),
-        ("Expected Loss", f"${expected_loss:,.0f}"),
-        ("Actual Outcome", outcome),
-    ])
-
-    FEATURE_LABELS = {
-        "loan to income ratio": "Loan amount compared with income",
-        "had delinquency": "Previous payment delinquency",
-        "grade default rate": "Historical risk of borrower's credit grade",
-        "region default rate": "Historical risk of borrower's region",
-        "interest rate percentile in grade": "Interest rate compared with similar borrowers",
-        "loan amount rank in grade": "Loan size compared with similar borrowers",
-        "loan amount": "Loan amount",
-        "interest rate": "Interest rate",
-        "term months": "Loan term length",
-        "dti": "Debt-to-income ratio",
-        "annual income": "Annual income",
-        "employment length": "Length of employment",
-        "grade": "Credit grade",
-        "home ownership": "Home ownership status",
-        "purpose": "Stated loan purpose",
-    }
-
-    def clean_feature_name(raw_name):
-        label = FEATURE_LABELS.get(raw_name)
-        if label is None:
-            base_key = next((k for k in FEATURE_LABELS if raw_name.startswith(k)), None)
-            label = FEATURE_LABELS.get(base_key, raw_name)
-        return label
-
-    X_transformed = preprocessor.transform(X_row)
-    feature_names = preprocessor.get_feature_names_out()
-    shap_values = explainer.shap_values(X_transformed)[0]
-
-    top_idx_all = np.argsort(np.abs(shap_values))[::-1]
-    # only the reasons pushing risk UP belong in "why this was flagged" —
-    # a protective factor isn't a reason for the recommendation
-    risk_increasing_idx = [i for i in top_idx_all if shap_values[i] > 0][:3]
-
-    reason_html = ""
-    for i in risk_increasing_idx:
-        raw_name = feature_names[i].replace("num__", "").replace("cat__", "").replace("_", " ")
-        reason_html += f"<li>{clean_feature_name(raw_name)}</li>"
-    if not reason_html:
-        reason_html = "<li>No single factor stands out — risk is driven by a broad combination of smaller signals</li>"
-
-    st.write("")
-    panel_open("Recommended Action")
-    st.markdown(f"""
-    <div class="tier-badge" style="color:{badge_color}; border-color:{badge_color}; font-size:14px; padding:7px 16px;">{action}</div>
-    <div style="margin-top:14px; font-family:'IBM Plex Sans', sans-serif; font-size:13px; color:var(--muted);">Reason</div>
-    <ul style="margin-top:6px; padding-left:18px; font-family:'IBM Plex Sans', sans-serif; font-size:14px; color:var(--text);">
-        {reason_html}
-    </ul>
-    """, unsafe_allow_html=True)
-    panel_close()
-
-    panel_open("Full driver breakdown", "Every top factor computed live for this loan, using the same trained model.")
-
-    top_idx = top_idx_all[:5]
-    max_abs = max(abs(shap_values[i]) for i in top_idx)
-
-    rows_html = ""
-    for i in top_idx:
-        val = shap_values[i]
-        pct = (abs(val) / max_abs) * 100
-        color = "#C1543C" if val > 0 else "#4C8B6C"
-        direction = "Increases risk" if val > 0 else "Decreases risk"
-        raw_name = feature_names[i].replace("num__", "").replace("cat__", "").replace("_", " ")
-        clean_name = clean_feature_name(raw_name)
-        rows_html += f"""
-        <div class="driver-row">
-            <div class="driver-name">{clean_name}</div>
-            <div class="driver-bar-track"><div class="driver-bar-fill" style="width:{pct}%; background:{color};"></div></div>
-            <div class="driver-dir" style="color:{color};">{direction}</div>
-        </div>
-        """
-    st.markdown(rows_html, unsafe_allow_html=True)
-    panel_close()
+    render_scoring_result(X_row, row["loan_amount"], actual_outcome=outcome)
 
 elif page == "monitoring":
     st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
@@ -797,7 +836,7 @@ elif page == "vintage":
         """)
         panel_close()
 
-else:
+elif page == "stress":
     st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
     st.title("Stress Testing")
     st.caption("Portfolio Expected Loss under real Fed CCAR/DFAST unemployment scenarios.")
@@ -850,3 +889,72 @@ else:
         - With only {fit_row['n_years_fitted']:.0f} data points and 2 predictors, this fit has 9 degrees of freedom — treat the sensitivity as directional, not precise, and re-fit as more years of data accumulate
         """)
         panel_close()
+
+else:
+    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
+    st.title("What-If Simulator")
+    st.caption("Score a hypothetical loan using the same trained model and SHAP explanations as Loan Explainability.")
+
+    GRADE_OPTIONS = ["A", "B", "C", "D", "E", "F", "G"]
+    HOME_OWNERSHIP_OPTIONS = ["MORTGAGE", "RENT", "OWN", "ANY", "OTHER", "NONE"]
+    PURPOSE_OPTIONS = [
+        "debt_consolidation", "credit_card", "home_improvement", "other",
+        "major_purchase", "small_business", "medical", "car", "moving",
+        "vacation", "house", "wedding", "renewable_energy", "educational",
+    ]
+
+    panel_open("Loan parameters", "Enter hypothetical values to see how the model would score this loan.")
+    c1, c2, c3 = st.columns(3)
+    loan_amount = c1.number_input("Loan amount ($)", min_value=500, max_value=40000, value=15000, step=500)
+    interest_rate = c2.number_input("Interest rate (%)", min_value=5.0, max_value=31.0, value=13.0, step=0.1)
+    term_months = c3.selectbox("Term (months)", [36, 60])
+
+    c4, c5, c6 = st.columns(3)
+    dti = c4.number_input("Debt-to-income ratio", min_value=0.0, max_value=60.0, value=18.0, step=0.5)
+    annual_income = c5.number_input("Annual income ($)", min_value=1000, max_value=1000000, value=65000, step=1000)
+    employment_length = c6.slider("Employment length (years)", min_value=0, max_value=10, value=5)
+
+    c7, c8, c9 = st.columns(3)
+    grade = c7.selectbox("Credit grade", GRADE_OPTIONS, index=2)
+    home_ownership = c8.selectbox("Home ownership", HOME_OWNERSHIP_OPTIONS)
+    purpose = c9.selectbox("Loan purpose", PURPOSE_OPTIONS)
+    panel_close()
+
+    region_default_rate = load_portfolio_avg_default_rate()
+    st.caption(
+        "Two simplifying assumptions: this form doesn't collect region, so region risk uses the "
+        f"portfolio-wide average default rate ({region_default_rate:.1%}) as a neutral stand-in; "
+        "and prior delinquency isn't collected either, so it's assumed to be none."
+    )
+
+    grade_rate_ranges = load_grade_rate_ranges()
+    grade_min_rate, grade_max_rate = grade_rate_ranges.loc[grade, ["min_rate", "max_rate"]]
+    if not (grade_min_rate <= interest_rate <= grade_max_rate):
+        st.markdown(f"""
+        <div style="background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--risk-high); padding: 14px 18px; margin-bottom: 20px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13.5px; color: var(--text);">
+        <strong style="color: var(--risk-high);">Out of distribution —</strong> Grade {grade} loans in the historical data run {grade_min_rate:.1f}%–{grade_max_rate:.1f}% — {interest_rate:.1f}% has never occurred for this grade, since Lending Club sets rate mostly by grade. The model has never seen this combination, so the score below is an extrapolation and may not be reliable.
+        </div>
+        """, unsafe_allow_html=True)
+
+    benchmarks = compute_grade_benchmarks(grade, interest_rate, loan_amount)
+    loan_to_income_ratio = round(loan_amount / annual_income, 4) if annual_income else 0
+
+    X_row = pd.DataFrame([{
+        "loan_amount": loan_amount,
+        "interest_rate": interest_rate,
+        "term_months": term_months,
+        "dti": dti,
+        "annual_income": annual_income,
+        "employment_length": employment_length,
+        "loan_to_income_ratio": loan_to_income_ratio,
+        "had_delinquency": 0,
+        "interest_rate_percentile_in_grade": float(benchmarks["interest_rate_percentile_in_grade"]),
+        "grade_default_rate": float(benchmarks["grade_default_rate"]),
+        "region_default_rate": float(region_default_rate),
+        "loan_amount_rank_in_grade": int(benchmarks["loan_amount_rank_in_grade"]),
+        "grade": grade,
+        "home_ownership": home_ownership,
+        "purpose": purpose,
+    }])
+
+    render_scoring_result(X_row, loan_amount)
