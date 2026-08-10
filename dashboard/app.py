@@ -10,7 +10,7 @@ from sqlalchemy import create_engine, text
 
 load_dotenv()
 
-st.set_page_config(page_title="Credit Risk Decision Intelligence Platform", layout="wide", page_icon="◆")
+st.set_page_config(page_title="Credit Risk Early Warning System", layout="wide", page_icon="◆")
 
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
@@ -278,8 +278,8 @@ ICON_SIMULATOR = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" 
 
 def render_sidebar_brand():
     st.sidebar.markdown(f"""
-    <div class="brand-row">{COIN_ICON}<span class="brand-wordmark">CRIP</span></div>
-    <div class="brand-full">Credit Risk Intelligence Platform</div>
+    <div class="brand-row">{COIN_ICON}<span class="brand-wordmark">CREWS</span></div>
+    <div class="brand-full">Credit Risk Early Warning System</div>
     <div class="brand-name">Built by Nurmuhammad Nazmi<br>Data Science Portfolio Project</div>
     <div class="brand-divider"></div>
     """, unsafe_allow_html=True)
@@ -539,7 +539,7 @@ st.sidebar.markdown(nav_html, unsafe_allow_html=True)
 page = current_page
 
 if page == "overview":
-    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">Credit Risk Early Warning System</div>', unsafe_allow_html=True)
     st.title("Executive Overview")
 
     total_loans = len(features_df)
@@ -597,7 +597,7 @@ if page == "overview":
     panel_close()
 
 elif page == "analytics":
-    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">Credit Risk Early Warning System</div>', unsafe_allow_html=True)
     st.title("Portfolio Analytics")
 
     merged_df = features_df.merge(
@@ -673,7 +673,7 @@ elif page == "analytics":
     panel_close()
 
 elif page == "explain":
-    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">Credit Risk Early Warning System</div>', unsafe_allow_html=True)
     st.title("Loan Explainability")
     st.caption("Look up any loan to see its risk score and what's actually driving it.")
 
@@ -687,7 +687,7 @@ elif page == "explain":
     render_scoring_result(X_row, row["loan_amount"], actual_outcome=outcome)
 
 elif page == "monitoring":
-    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">Credit Risk Early Warning System</div>', unsafe_allow_html=True)
     st.title("Model Monitoring")
     st.caption("Performance history for every model version that's been trained and deployed.")
 
@@ -753,7 +753,7 @@ elif page == "monitoring":
         panel_close()
 
 elif page == "vintage":
-    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">Credit Risk Early Warning System</div>', unsafe_allow_html=True)
     st.title("Vintage Analysis")
     st.caption("Cumulative default rate by months on book, one curve per loan-origination quarter.")
 
@@ -837,7 +837,7 @@ elif page == "vintage":
         panel_close()
 
 elif page == "stress":
-    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">Credit Risk Early Warning System</div>', unsafe_allow_html=True)
     st.title("Stress Testing")
     st.caption("Portfolio Expected Loss under real Fed CCAR/DFAST unemployment scenarios.")
 
@@ -891,7 +891,7 @@ elif page == "stress":
         panel_close()
 
 else:
-    st.markdown('<div class="eyebrow">Credit Risk Decision Intelligence Platform</div>', unsafe_allow_html=True)
+    st.markdown('<div class="eyebrow">Credit Risk Early Warning System</div>', unsafe_allow_html=True)
     st.title("What-If Simulator")
     st.caption("Score a hypothetical loan using the same trained model and SHAP explanations as Loan Explainability.")
 

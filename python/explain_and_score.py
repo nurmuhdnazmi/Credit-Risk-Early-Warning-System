@@ -113,6 +113,8 @@ print(results[["loan_id", "risk_score", "recommended_action", "top_shap_drivers"
 
 # Calibration curve — compares predicted probability against actual default rate
 fraction_of_positives, mean_predicted_value = calibration_curve(y_test, probs, n_bins=10)
+print(f"Calibration curve — mean predicted probability per bin: {np.round(mean_predicted_value, 4).tolist()}")
+print(f"Calibration curve — fraction of actual defaults per bin: {np.round(fraction_of_positives, 4).tolist()}")
 
 plt.figure()
 plt.plot(mean_predicted_value, fraction_of_positives, marker="o", label="XGBoost")
