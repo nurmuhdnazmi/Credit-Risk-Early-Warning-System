@@ -2,7 +2,7 @@
 
 ## A model told me a loan had an 80% chance of default. It was wrong.
 
-Early in this project, the model was flagging loans as extremely high risk at a rate that didn't match reality. A calibration curve confirmed it: when the model assigned probabilities around 80%, the observed default rate for those loans was closer to 55%. Lower down the scale, predicted probabilities around 40% corresponded to observed rates closer to 18%. The model wasn't broken. It had been trained with a technique that improves classification at the cost of honest probabilities, and nobody had checked.
+Early in this project, the model was flagging loans as extremely high risk at a rate that didn't match reality. A calibration curve made it visible: at the high end of the scale, predicted risk was running well ahead of how often those loans actually defaulted. The model wasn't broken. It had been trained with a technique that improves classification at the cost of honest probabilities, and nobody had checked. The fix, and the exact numbers proving it worked, are below.
 
 Fixing that, and the string of similar findings that followed it, is what this project actually is. Not a notebook that trains XGBoost and reports an accuracy score, but a working pipeline that tries to get the numbers right, catches itself when they aren't, and says so.
 
@@ -98,7 +98,9 @@ The loop matters more than any single stage. Every number on the dashboard trace
 
 A few findings surfaced during this build that were genuinely unexpected, and are worth more than a bullet point.
 
-**The calibration problem.** The model used `scale_pos_weight` to handle the roughly 20/80 class imbalance between defaulted and healthy loans. This is standard practice for improving recall, but it distorts the model's raw probabilities in the process. A loan scored at 80% risk was not actually defaulting 80% of the time. Recalibrating with isotonic regression on a held out split fixed this, and it mattered financially: the portfolio's Expected Loss estimate dropped from an inflated $45.4M to a trustworthy $21.1M once the fix was in.
+**The calibration problem.** The model used `scale_pos_weight` to handle the roughly 20/80 class imbalance between defaulted and healthy loans. This is standard practice for improving recall, but it distorts the model's raw probabilities in the process. A loan scored at 80% risk was not actually defaulting anywhere near 80% of the time. Recalibrating with isotonic regression on a held out split fixed this, and it mattered financially: the portfolio's Expected Loss estimate dropped from an inflated $45.4M to a trustworthy $21.1M once the fix was in.
+
+The fix holds up under inspection, not just in theory. Across the bins covering roughly 7% to 56% predicted probability, which is where the bulk of the portfolio actually falls, predicted and observed default rates now track closely: 45.8% predicted against 45.7% observed, 56.3% predicted against 56.0% observed, and similarly tight across the rest of that range. The two highest bins deviate more (one lands at 100%, the other at 67%), but each covers only a handful of loans, a known instability of isotonic regression in a sparse tail rather than a new problem the fix introduced.
 
 **Underwriting drift, not a financial crisis effect.** The dataset spans 2007 to 2018, covering the financial crisis. The instinct was to expect loans originated during 2007 to 2009 to default more often. They didn't. At the 36 month mark, crisis era loans defaulted at 15.3% against 19.6% for every other cohort. The real story turned out to be something else: raw default rates climbed steadily from 12.5% in 2010 to 24.8% in 2016, tracking the platform's growth from a small early user base to a mass market product reaching further down the credit spectrum. The crisis window is also too small a sample (372 loans) to say anything statistically confident either way.
 
