@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 .env
 archive/*.csv
-models/*.joblib
 .DS_Store
 CLAUDE.md
+.streamlit/secrets.toml
+database/full_dump.sql

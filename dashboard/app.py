@@ -12,16 +12,55 @@ load_dotenv()
 
 st.set_page_config(page_title="Credit Risk Early Warning System", layout="wide", page_icon="◆")
 
-DB_USER = os.getenv("DB_USER", "root")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_NAME = os.getenv("DB_NAME", "credit_risk_platform")
+# Resolved from this file's own location rather than a "../models" relative
+# path, since the working directory differs between local runs (dashboard/)
+# and Streamlit Community Cloud, which always runs from the repo root.
+MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models")
+
+
+def get_config(key, default=None):
+    # st.secrets takes priority (Streamlit Cloud), falling back to .env /
+    # environment variables (local). Accessing st.secrets raises when no
+    # secrets.toml exists anywhere, which is the normal local case.
+    try:
+        value = st.secrets.get(key)
+    except Exception:
+        value = None
+    if value is not None:
+        return value
+    return os.getenv(key, default)
+
+
+DB_USER = get_config("DB_USER", "root")
+DB_PASSWORD = get_config("DB_PASSWORD", "")
+DB_HOST = get_config("DB_HOST", "localhost")
+DB_PORT = get_config("DB_PORT", "3306")
+DB_NAME = get_config("DB_NAME", "credit_risk_platform")
+
+# Managed MySQL (e.g. Aiven's free tier) requires TLS and hands out a CA
+# certificate. DB_SSL_CA can be either a path to that file (set it this way
+# locally) or the certificate's PEM content pasted directly into Streamlit
+# Cloud secrets, since Cloud secrets can't reference a file on disk.
+DB_SSL_CA = get_config("DB_SSL_CA")
+connect_args = {}
+if DB_SSL_CA:
+    if os.path.isfile(DB_SSL_CA):
+        ca_path = DB_SSL_CA
+    else:
+        ca_path = "/tmp/db_ca.pem"
+        with open(ca_path, "w") as f:
+            f.write(DB_SSL_CA)
+    connect_args["ssl_ca"] = ca_path
+    connect_args["ssl_verify_cert"] = True
 
 # Matches the flat LGD assumption used in explain_and_score.py, so live
 # expected-loss figures for loans outside the scored test set stay consistent.
 LGD_ASSUMPTION = 0.45
 
-engine = create_engine(f"mysql+mysqlconnector://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}")
+engine = create_engine(
+    f"mysql+mysqlconnector://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}",
+    connect_args=connect_args,
+)
 
 
 def inject_css():
@@ -499,7 +538,7 @@ def compute_grade_benchmarks(grade, interest_rate, loan_amount):
 
 @st.cache_resource
 def load_model_and_explainer():
-    saved_model = joblib.load("../models/xgb_model_v1.joblib")
+    saved_model = joblib.load(os.path.join(MODELS_DIR, "xgb_model_v1.joblib"))
     pipeline = saved_model["pipeline"]  # raw preprocess+model, needed for SHAP
     calibrated_model = saved_model["calibrated_model"]  # source of every probability shown
     model = pipeline.named_steps["model"]
@@ -729,7 +768,7 @@ elif page == "monitoring":
             """)
 
         panel_open("Calibration", "Does a 70% risk score actually mean ~70% of those loans default?")
-        st.image("../models/calibration_curve.png", width="stretch")
+        st.image(os.path.join(MODELS_DIR, "calibration_curve.png"), width="stretch")
         st.caption(
             "Isotonic regression was fit on a held-out calibration split so predicted "
             "probabilities track actual default rates, rather than just ranking loans "
