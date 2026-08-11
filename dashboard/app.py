@@ -5,6 +5,7 @@ import joblib
 import shap
 import altair as alt
 import os
+import base64
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 
@@ -117,6 +118,14 @@ def inject_css():
         color: var(--text);
     }
 
+    h1 {
+        font-size: 1.9rem;
+    }
+
+    .main .block-container {
+        padding-top: 2.5rem;
+    }
+
     section[data-testid="stSidebar"] {
         background: var(--sidebar-bg);
         border-right: 1px solid #2A322E;
@@ -128,8 +137,9 @@ def inject_css():
 
     .brand-row {
         display: flex;
-        align-items: center;
-        gap: 8px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
         margin-bottom: 10px;
     }
 
@@ -140,12 +150,12 @@ def inject_css():
     }
 
     .brand-row:hover .brand-icon {
-        transform: rotate(-8deg) scale(1.08);
+        transform: rotate(-8deg) scale(1.05);
     }
 
     .brand-wordmark {
         font-family: 'Space Grotesk', sans-serif;
-        font-size: 22px;
+        font-size: 24px;
         font-weight: 700;
         letter-spacing: 0.02em;
         color: var(--accent);
@@ -157,15 +167,7 @@ def inject_css():
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--sidebar-muted);
-        margin-bottom: 10px;
-    }
-
-    .brand-name {
-        font-family: 'Work Sans', sans-serif;
-        font-size: 11.5px;
-        line-height: 1.5;
-        color: var(--sidebar-muted);
-        margin-bottom: 18px;
+        margin-bottom: 14px;
     }
 
     .brand-divider {
@@ -173,35 +175,58 @@ def inject_css():
         margin-bottom: 10px;
     }
 
-    .nav-link {
+    /* Sidebar nav is built from real st.button widgets (not <a href> links)
+       so page switches happen over Streamlit's websocket rerun instead of a
+       full browser navigation — that full reload was the source of both the
+       white flash and, before this CSS, a moment of unstyled default link
+       (blue, underlined) rendering. */
+    section[data-testid="stSidebar"] div[data-testid="stButton"] {
+        margin-bottom: 3px;
+    }
+
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button {
+        width: 100%;
         display: flex;
         align-items: center;
+        justify-content: flex-start;
         gap: 11px;
         padding: 9px 12px;
-        margin-bottom: 3px;
         border-radius: 8px;
-        text-decoration: none;
+        border: 1px solid transparent;
+        background: transparent;
         color: var(--sidebar-muted);
         font-family: 'Work Sans', sans-serif;
         font-size: 14px;
-        transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, padding-left 0.15s ease;
+        text-align: left;
+        transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
     }
 
-    .nav-link:hover {
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
         background: #262E29;
         color: var(--sidebar-text);
+        border-color: transparent;
         transform: translateX(2px);
     }
 
-    .nav-link-active {
-        background: #262E29;
-        color: var(--accent);
-        border-left: 2px solid var(--accent);
-        padding-left: 10px;
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button:focus:not(:active) {
+        border-color: transparent;
+        color: var(--sidebar-text);
     }
 
-    .nav-link svg {
-        flex-shrink: 0;
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {
+        background: #262E29;
+        color: var(--accent);
+        border: 1px solid var(--accent);
+    }
+
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"]:hover {
+        background: #262E29;
+        color: var(--accent);
+    }
+
+    section[data-testid="stSidebar"] div[data-testid="stButton"] button p {
+        font-family: 'Work Sans', sans-serif;
+        font-size: 14px;
     }
 
     .eyebrow {
@@ -216,16 +241,18 @@ def inject_css():
 
     .kpi-row {
         display: flex;
+        flex-wrap: wrap;
         gap: 1px;
         background: var(--border);
         border: 1px solid var(--border);
-        margin: 18px 0 28px 0;
+        margin: 16px 0 24px 0;
     }
 
     .kpi-card {
         background: var(--surface);
-        flex: 1;
-        padding: 18px 22px;
+        flex: 1 1 150px;
+        min-width: 150px;
+        padding: 14px 16px;
         border-top: 3px solid var(--accent);
         transition: box-shadow 0.2s ease, transform 0.2s ease;
     }
@@ -238,16 +265,16 @@ def inject_css():
     .kpi-label {
         font-family: 'Work Sans', sans-serif;
         font-weight: 600;
-        font-size: 10.5px;
-        letter-spacing: 0.1em;
+        font-size: 10px;
+        letter-spacing: 0.09em;
         text-transform: uppercase;
         color: var(--muted);
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }
 
     .kpi-value {
         font-family: 'JetBrains Mono', monospace;
-        font-size: 27px;
+        font-size: 21px;
         font-weight: 500;
         color: var(--text);
         font-variant-numeric: tabular-nums;
@@ -256,8 +283,8 @@ def inject_css():
     .panel {
         background: var(--surface);
         border: 1px solid var(--border);
-        padding: 20px 22px;
-        margin-bottom: 20px;
+        padding: 16px 18px;
+        margin-bottom: 16px;
         transition: box-shadow 0.2s ease;
     }
 
@@ -370,7 +397,7 @@ def inject_css():
     """, unsafe_allow_html=True)
 
 
-COIN_ICON = """<svg class="brand-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="9"/><path d="M12 7 L12 17 M9.3 9.5 Q9.3 7.8 12 7.8 Q14.7 7.8 14.7 9.5 Q14.7 11.2 12 11.2 Q9.3 11.2 9.3 12.8 Q9.3 14.5 12 14.5 Q14.7 14.5 14.7 12.8"/></svg>"""
+COIN_ICON = """<svg class="brand-icon" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="9"/><path d="M12 7 L12 17 M9.3 9.5 Q9.3 7.8 12 7.8 Q14.7 7.8 14.7 9.5 Q14.7 11.2 12 11.2 Q9.3 11.2 9.3 12.8 Q9.3 14.5 12 14.5 Q14.7 14.5 14.7 12.8"/></svg>"""
 
 ICON_OVERVIEW = """<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="3.2" height="9"/><rect x="10.4" y="5" width="3.2" height="14"/><rect x="16.8" y="13" width="3.2" height="6"/></svg>"""
 
@@ -391,7 +418,6 @@ def render_sidebar_brand():
     st.sidebar.markdown(f"""
     <div class="brand-row">{COIN_ICON}<span class="brand-wordmark">CREWS</span></div>
     <div class="brand-full">Credit Risk Early Warning System</div>
-    <div class="brand-name">Built by Nurmuhammad Nazmi<br>Data Science Portfolio Project</div>
     <div class="brand-divider"></div>
     """, unsafe_allow_html=True)
 
@@ -684,15 +710,38 @@ NAV_ITEMS = [
     ("simulator", "What-If Simulator", ICON_SIMULATOR),
 ]
 
-current_page = st.query_params.get("page", "overview")
+if "page" not in st.session_state:
+    st.session_state.page = st.query_params.get("page", "overview")
 
-nav_html = ""
+# Icons are baked into a data-URI background-image per button, positioned by
+# nth-of-type, since a plain st.button label can't hold raw SVG.
+nav_icon_css = "<style>"
+for idx, (key, label, icon) in enumerate(NAV_ITEMS, start=1):
+    icon_uri = "data:image/svg+xml;base64," + base64.b64encode(icon.replace("currentColor", "#8B9285").encode()).decode()
+    nav_icon_css += f"""
+    section[data-testid="stSidebar"] div[data-testid="stButton"]:nth-of-type({idx}) button::before {{
+        content: "";
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        min-width: 18px;
+        background-image: url('{icon_uri}');
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+    }}
+    """
+nav_icon_css += "</style>"
+st.sidebar.markdown(nav_icon_css, unsafe_allow_html=True)
+
 for key, label, icon in NAV_ITEMS:
-    css_class = "nav-link nav-link-active" if key == current_page else "nav-link"
-    nav_html += f'<a href="?page={key}" target="_self" class="{css_class}">{icon}<span>{label}</span></a>'
-st.sidebar.markdown(nav_html, unsafe_allow_html=True)
+    is_active = st.session_state.page == key
+    if st.sidebar.button(label, key=f"nav_{key}", width="stretch", type="primary" if is_active else "secondary"):
+        st.session_state.page = key
+        st.query_params["page"] = key
+        st.rerun()
 
-page = current_page
+page = st.session_state.page
 
 if page == "overview":
     st.markdown('<div class="eyebrow">Credit Risk Early Warning System</div>', unsafe_allow_html=True)
