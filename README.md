@@ -32,7 +32,7 @@ The objective was never to maximize predictive accuracy. It was to build a risk 
 <img width="1470" height="813" alt="image" src="https://github.com/user-attachments/assets/f25258df-975c-4810-81d0-21ad234509c0" />
 
 ### What-If Loan Simulator
-![Uploading image.png…]()
+<img width="1470" height="813" alt="image" src="https://github.com/user-attachments/assets/b09b3237-ed20-41b0-8037-a62aafb1a008" />
 
 ## What it does
 
