@@ -1,5 +1,7 @@
 # Credit Risk Early Warning System
 
+**[Live demo →](https://credit-risk-early-warning-system-nurmuhdnazmi.streamlit.app)**
+
 ## A model told me a loan had an 80% chance of default. It was wrong.
 
 Early in this project, the model was flagging loans as extremely high risk at a rate that didn't match reality. A calibration curve made it visible: at the high end of the scale, predicted risk was running well ahead of how often those loans actually defaulted. The model wasn't broken. It had been trained with a technique that improves classification at the cost of honest probabilities, and nobody had checked. The fix, and the exact numbers proving it worked, are below.
