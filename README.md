@@ -25,19 +25,14 @@ The objective was never to maximize predictive accuracy. It was to build a risk 
 
 ## Dashboard
 
-Screenshots go here once the cosmetic pass is finished.
-
 ### Executive Overview
-`models/screenshot_overview.png`
+<img width="2940" height="1628" alt="image" src="https://github.com/user-attachments/assets/c3c39ae2-4509-4fcd-8ddc-6a85154dfd0a" />
 
 ### Vintage Analysis
-`models/screenshot_vintage.png`
-
-### Stress Testing
-`models/screenshot_stress.png`
+<img width="1470" height="813" alt="image" src="https://github.com/user-attachments/assets/f25258df-975c-4810-81d0-21ad234509c0" />
 
 ### What-If Loan Simulator
-`models/screenshot_simulator.png`
+![Uploading image.png…]()
 
 ## What it does
 
