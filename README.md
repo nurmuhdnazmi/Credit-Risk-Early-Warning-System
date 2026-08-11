@@ -1,6 +1,4 @@
-# Credit Risk Early Warning System
-
-**[Live demo →](https://credit-risk-early-warning-system-nurmuhdnazmi.streamlit.app)**
+# Credit Risk Early Warning System  **[Live demo →](https://credit-risk-early-warning-system-nurmuhdnazmi.streamlit.app)**
 
 ## A model told me a loan had an 80% chance of default. It was wrong.
 
