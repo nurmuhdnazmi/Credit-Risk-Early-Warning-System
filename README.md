@@ -26,10 +26,10 @@ The objective was never to maximize predictive accuracy. It was to build a risk 
 ## Dashboard
 
 ### Executive Overview
-<img width="2940" height="1628" alt="image" src="https://github.com/user-attachments/assets/c3c39ae2-4509-4fcd-8ddc-6a85154dfd0a" />
+<img width="1470" height="814" alt="image" src="https://github.com/user-attachments/assets/af75dda7-f6c0-48aa-b00e-9a1b8bb65594" />
 
 ### Vintage Analysis
-<img width="1470" height="813" alt="image" src="https://github.com/user-attachments/assets/f25258df-975c-4810-81d0-21ad234509c0" />
+<img width="2940" height="1628" alt="image" src="https://github.com/user-attachments/assets/c3c39ae2-4509-4fcd-8ddc-6a85154dfd0a" />
 
 ### What-If Loan Simulator
 <img width="1470" height="813" alt="image" src="https://github.com/user-attachments/assets/b09b3237-ed20-41b0-8037-a62aafb1a008" />
