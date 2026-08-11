@@ -66,25 +66,34 @@ engine = create_engine(
 def inject_css():
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
     :root {
-        --bg: #0B1220;
-        --surface: #121A2B;
-        --surface-2: #182036;
-        --border: #26314A;
-        --text: #E8ECF4;
-        --muted: #8B96AC;
-        --gold: #C9A24B;
-        --gold-dim: #8A7238;
-        --risk-low: #4C8B6C;
-        --risk-mid: #C9A24B;
-        --risk-high: #C1543C;
-        --risk-severe: #8B2E20;
+        --bg: #EEF1ED;
+        --surface: #FFFFFF;
+        --surface-2: #F4F6F1;
+        --border: #D8DCD3;
+        --text: #1C2321;
+        --muted: #6B7268;
+
+        --sidebar-bg: #1C2321;
+        --sidebar-text: #EEF1ED;
+        --sidebar-muted: #8B9285;
+
+        --accent: #C79A3E;
+        --accent-ink: #996E00;
+
+        --grade-a: #2F6F5E;
+        --grade-b: #578454;
+        --grade-c: #8D9242;
+        --grade-d: #C79A3E;
+        --grade-e: #B97830;
+        --grade-f: #A5582D;
+        --grade-g: #8C3B2E;
     }
 
     html, body, [class*="css"] {
-        font-family: 'IBM Plex Sans', sans-serif;
+        font-family: 'Work Sans', sans-serif;
     }
 
     .stApp {
@@ -92,16 +101,25 @@ def inject_css():
         color: var(--text);
     }
 
+    .main .block-container {
+        animation: fadeInUp 0.4s ease-out;
+    }
+
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
     h1, h2, h3 {
-        font-family: 'Fraunces', serif;
-        font-weight: 500;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 600;
         letter-spacing: -0.01em;
         color: var(--text);
     }
 
     section[data-testid="stSidebar"] {
-        background: var(--surface);
-        border-right: 1px solid var(--border);
+        background: var(--sidebar-bg);
+        border-right: 1px solid #2A322E;
     }
 
     section[data-testid="stSidebar"] > div {
@@ -116,37 +134,42 @@ def inject_css():
     }
 
     .brand-icon {
-        color: var(--gold);
+        color: var(--accent);
         flex-shrink: 0;
+        transition: transform 0.25s ease;
+    }
+
+    .brand-row:hover .brand-icon {
+        transform: rotate(-8deg) scale(1.08);
     }
 
     .brand-wordmark {
-        font-family: 'Fraunces', serif;
+        font-family: 'Space Grotesk', sans-serif;
         font-size: 22px;
-        font-weight: 500;
-        letter-spacing: 0.04em;
-        color: var(--gold);
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: var(--accent);
     }
 
     .brand-full {
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: 'Work Sans', sans-serif;
         font-size: 10.5px;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: var(--muted);
+        color: var(--sidebar-muted);
         margin-bottom: 10px;
     }
 
     .brand-name {
-        font-family: 'IBM Plex Sans', sans-serif;
+        font-family: 'Work Sans', sans-serif;
         font-size: 11.5px;
         line-height: 1.5;
-        color: var(--muted);
+        color: var(--sidebar-muted);
         margin-bottom: 18px;
     }
 
     .brand-divider {
-        border-top: 1px solid var(--border);
+        border-top: 1px solid #2A322E;
         margin-bottom: 10px;
     }
 
@@ -158,21 +181,22 @@ def inject_css():
         margin-bottom: 3px;
         border-radius: 8px;
         text-decoration: none;
-        color: var(--muted);
-        font-family: 'IBM Plex Sans', sans-serif;
+        color: var(--sidebar-muted);
+        font-family: 'Work Sans', sans-serif;
         font-size: 14px;
-        transition: background 0.15s ease;
+        transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, padding-left 0.15s ease;
     }
 
     .nav-link:hover {
-        background: var(--surface-2);
-        color: var(--text);
+        background: #262E29;
+        color: var(--sidebar-text);
+        transform: translateX(2px);
     }
 
     .nav-link-active {
-        background: var(--surface-2);
-        color: var(--gold);
-        border-left: 2px solid var(--gold);
+        background: #262E29;
+        color: var(--accent);
+        border-left: 2px solid var(--accent);
         padding-left: 10px;
     }
 
@@ -181,11 +205,12 @@ def inject_css():
     }
 
     .eyebrow {
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: 'Work Sans', sans-serif;
+        font-weight: 600;
         font-size: 11px;
         letter-spacing: 0.14em;
         text-transform: uppercase;
-        color: var(--gold-dim);
+        color: var(--accent-ink);
         margin-bottom: 4px;
     }
 
@@ -201,11 +226,18 @@ def inject_css():
         background: var(--surface);
         flex: 1;
         padding: 18px 22px;
-        border-top: 2px solid var(--gold);
+        border-top: 3px solid var(--accent);
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .kpi-card:hover {
+        box-shadow: 0 4px 14px rgba(28, 35, 33, 0.08);
+        transform: translateY(-1px);
     }
 
     .kpi-label {
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: 'Work Sans', sans-serif;
+        font-weight: 600;
         font-size: 10.5px;
         letter-spacing: 0.1em;
         text-transform: uppercase;
@@ -214,8 +246,8 @@ def inject_css():
     }
 
     .kpi-value {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 28px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 27px;
         font-weight: 500;
         color: var(--text);
         font-variant-numeric: tabular-nums;
@@ -226,17 +258,23 @@ def inject_css():
         border: 1px solid var(--border);
         padding: 20px 22px;
         margin-bottom: 20px;
+        transition: box-shadow 0.2s ease;
+    }
+
+    .panel:hover {
+        box-shadow: 0 4px 14px rgba(28, 35, 33, 0.06);
     }
 
     .panel-title {
-        font-family: 'Fraunces', serif;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 600;
         font-size: 17px;
         color: var(--text);
         margin-bottom: 4px;
     }
 
     .panel-sub {
-        font-family: 'IBM Plex Sans', sans-serif;
+        font-family: 'Work Sans', sans-serif;
         font-size: 12.5px;
         color: var(--muted);
         margin-bottom: 14px;
@@ -244,12 +282,44 @@ def inject_css():
 
     .tier-badge {
         display: inline-block;
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: 'JetBrains Mono', monospace;
         font-size: 12px;
         letter-spacing: 0.05em;
         text-transform: uppercase;
         padding: 5px 12px;
         border: 1px solid;
+    }
+
+    .grade-strip {
+        display: flex;
+        border: 1px solid var(--border);
+        margin: 18px 0 28px 0;
+        overflow: hidden;
+    }
+
+    .grade-swatch {
+        flex: 1;
+        padding: 14px 10px;
+        text-align: center;
+        transition: flex-grow 0.25s ease;
+    }
+
+    .grade-swatch:hover {
+        flex-grow: 1.6;
+    }
+
+    .grade-letter {
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 700;
+        font-size: 20px;
+        line-height: 1.1;
+    }
+
+    .grade-rate {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11.5px;
+        margin-top: 4px;
+        opacity: 0.9;
     }
 
     .driver-row {
@@ -261,7 +331,7 @@ def inject_css():
     }
 
     .driver-name {
-        font-family: 'IBM Plex Mono', monospace;
+        font-family: 'Work Sans', sans-serif;
         font-size: 12.5px;
         color: var(--text);
         width: 260px;
@@ -277,10 +347,11 @@ def inject_css():
 
     .driver-bar-fill {
         height: 100%;
+        transition: width 0.4s ease;
     }
 
     .driver-dir {
-        font-family: 'IBM Plex Sans', sans-serif;
+        font-family: 'Work Sans', sans-serif;
         font-size: 11.5px;
         width: 110px;
         text-align: right;
@@ -289,6 +360,7 @@ def inject_css():
 
     [data-testid="stDataFrame"] {
         border: 1px solid var(--border);
+        font-family: 'JetBrains Mono', monospace;
     }
 
     hr {
@@ -324,11 +396,11 @@ def render_sidebar_brand():
     """, unsafe_allow_html=True)
 
 
-def kpi_row(items):
-    cards = "".join(
-        f'<div class="kpi-card"><div class="kpi-label">{label}</div><div class="kpi-value">{value}</div></div>'
-        for label, value in items
-    )
+def kpi_row(items, colors=None):
+    cards = ""
+    for i, (label, value) in enumerate(items):
+        border = f' style="border-top-color:{colors[i]};"' if colors else ""
+        cards += f'<div class="kpi-card"{border}><div class="kpi-label">{label}</div><div class="kpi-value">{value}</div></div>'
     st.markdown(f'<div class="kpi-row">{cards}</div>', unsafe_allow_html=True)
 
 
@@ -344,24 +416,69 @@ def panel_close():
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+# Seven-stop ramp mapped to the real loan grades A (safest) through G
+# (riskiest), interpolated in OKLCH from three anchor colors so the hue
+# shifts smoothly (teal -> amber -> rust) rather than muddying through gray.
+GRADE_ORDER = ["A", "B", "C", "D", "E", "F", "G"]
+GRADE_COLORS = {
+    "A": "#2F6F5E", "B": "#578454", "C": "#8D9242", "D": "#C79A3E",
+    "E": "#B97830", "F": "#A5582D", "G": "#8C3B2E",
+}
+# Same hues, darkened where needed (C, D, E) to clear text/line contrast on
+# the light page background — the raw swatch colors above read fine as
+# large fills but two of them (C, D) fall below 3:1 as thin text or lines.
+GRADE_INK = {
+    "A": "#2F6F5E", "B": "#578454", "C": "#757A28", "D": "#996E00",
+    "E": "#A66619", "F": "#A5582D", "G": "#8C3B2E",
+}
+# Which text color reads best on a filled swatch of each grade's color.
+GRADE_TEXT_ON_FILL = {
+    "A": "#FFFFFF", "B": "#FFFFFF", "C": "#1C2321", "D": "#1C2321",
+    "E": "#1C2321", "F": "#FFFFFF", "G": "#FFFFFF",
+}
+
+
+def render_grade_strip(default_rate_by_grade):
+    swatches = ""
+    for g in GRADE_ORDER:
+        rate = default_rate_by_grade.get(g)
+        rate_html = f'<div class="grade-rate">{rate:.1%}</div>' if rate is not None else ""
+        swatches += f'<div class="grade-swatch" style="background:{GRADE_COLORS[g]}; color:{GRADE_TEXT_ON_FILL[g]};"><div class="grade-letter">{g}</div>{rate_html}</div>'
+    st.markdown(f'<div class="grade-strip">{swatches}</div>', unsafe_allow_html=True)
+
+
+# The four risk-action tiers aren't grades, but they're an ordered severity
+# scale too, so they draw from the same ramp instead of a separate palette —
+# one color language for every risk decision in the app.
 TIER_COLORS = {
-    "Standard monitoring": "#4C8B6C",
-    "Increase monitoring": "#C9A24B",
-    "Reduce credit limit": "#C1543C",
-    "Manual review": "#8B2E20",
+    "Standard monitoring": GRADE_INK["B"],
+    "Increase monitoring": GRADE_INK["D"],
+    "Reduce credit limit": GRADE_INK["F"],
+    "Manual review": GRADE_INK["G"],
 }
 TIER_ORDER = ["Standard monitoring", "Increase monitoring", "Reduce credit limit", "Manual review"]
+
+# Stress scenarios are a severity scale too: calm, caution, danger.
+STRESS_COLORS = {
+    "baseline": GRADE_INK["A"],
+    "adverse": GRADE_INK["D"],
+    "severely_adverse": GRADE_INK["G"],
+}
+
+AXIS_LABEL_COLOR = "#6B7268"
+AXIS_LINE_COLOR = "#C5CABF"
+AXIS_GRID_COLOR = "#E3E6DF"
 
 
 def styled_bar_chart(df, x_col, y_col, color_map=None, height=260):
     base = alt.Chart(df).mark_bar(size=28).encode(
-        x=alt.X(f"{x_col}:N", sort=None, axis=alt.Axis(labelAngle=0, labelColor="#8B96AC", titleColor="#8B96AC", domainColor="#26314A", tickColor="#26314A")),
-        y=alt.Y(f"{y_col}:Q", axis=alt.Axis(labelColor="#8B96AC", titleColor="#8B96AC", domainColor="#26314A", tickColor="#26314A", gridColor="#182036")),
+        x=alt.X(f"{x_col}:N", sort=None, axis=alt.Axis(labelAngle=0, labelFont="Work Sans", titleFont="Work Sans", labelColor=AXIS_LABEL_COLOR, titleColor=AXIS_LABEL_COLOR, domainColor=AXIS_LINE_COLOR, tickColor=AXIS_LINE_COLOR)),
+        y=alt.Y(f"{y_col}:Q", axis=alt.Axis(labelFont="JetBrains Mono", titleFont="Work Sans", labelColor=AXIS_LABEL_COLOR, titleColor=AXIS_LABEL_COLOR, domainColor=AXIS_LINE_COLOR, tickColor=AXIS_LINE_COLOR, gridColor=AXIS_GRID_COLOR)),
     )
     if color_map:
         base = base.encode(color=alt.Color(f"{x_col}:N", scale=alt.Scale(domain=list(color_map.keys()), range=list(color_map.values())), legend=None))
     else:
-        base = base.encode(color=alt.value("#C9A24B"))
+        base = base.encode(color=alt.value(GRADE_INK["D"]))
     return base.properties(height=height, background="transparent").configure_view(strokeWidth=0)
 
 
@@ -425,7 +542,7 @@ def render_scoring_result(X_row, loan_amount, actual_outcome=None):
     ]
     if actual_outcome is not None:
         kpi_items.append(("Actual Outcome", actual_outcome))
-    kpi_row(kpi_items)
+    kpi_row(kpi_items, colors=[badge_color] * len(kpi_items))
 
     X_transformed = preprocessor.transform(X_row)
     feature_names = preprocessor.get_feature_names_out()
@@ -447,8 +564,8 @@ def render_scoring_result(X_row, loan_amount, actual_outcome=None):
     panel_open("Recommended Action")
     st.markdown(f"""
     <div class="tier-badge" style="color:{badge_color}; border-color:{badge_color}; font-size:14px; padding:7px 16px;">{action}</div>
-    <div style="margin-top:14px; font-family:'IBM Plex Sans', sans-serif; font-size:13px; color:var(--muted);">Reason</div>
-    <ul style="margin-top:6px; padding-left:18px; font-family:'IBM Plex Sans', sans-serif; font-size:14px; color:var(--text);">
+    <div style="margin-top:14px; font-family:'Work Sans', sans-serif; font-size:13px; color:var(--muted);">Reason</div>
+    <ul style="margin-top:6px; padding-left:18px; font-family:'Work Sans', sans-serif; font-size:14px; color:var(--text);">
         {reason_html}
     </ul>
     """, unsafe_allow_html=True)
@@ -463,7 +580,7 @@ def render_scoring_result(X_row, loan_amount, actual_outcome=None):
     for i in top_idx:
         val = shap_values[i]
         pct = (abs(val) / max_abs) * 100
-        color = "#C1543C" if val > 0 else "#4C8B6C"
+        color = GRADE_INK["G"] if val > 0 else GRADE_INK["A"]
         direction = "Increases risk" if val > 0 else "Decreases risk"
         raw_name = feature_names[i].replace("num__", "").replace("cat__", "").replace("_", " ")
         clean_name = clean_feature_name(raw_name)
@@ -581,6 +698,8 @@ if page == "overview":
     st.markdown('<div class="eyebrow">Credit Risk Early Warning System</div>', unsafe_allow_html=True)
     st.title("Executive Overview")
 
+    render_grade_strip(features_df.groupby("grade")["default_flag"].mean())
+
     total_loans = len(features_df)
     default_rate = features_df["default_flag"].mean()
     avg_risk_score = risk_df["risk_score"].mean() if not risk_df.empty else np.nan
@@ -600,7 +719,8 @@ if page == "overview":
         st.markdown('<div class="eyebrow">Portfolio Expected Loss</div>', unsafe_allow_html=True)
         kpi_row(
             [("Total Expected Loss", f"${total_expected_loss:,.0f}")]
-            + [(tier, f"${el_by_tier[tier]:,.0f}") for tier in TIER_ORDER]
+            + [(tier, f"${el_by_tier[tier]:,.0f}") for tier in TIER_ORDER],
+            colors=[GRADE_INK["D"]] + [TIER_COLORS[tier] for tier in TIER_ORDER],
         )
 
     if not risk_df.empty:
@@ -614,7 +734,7 @@ if page == "overview":
             ("Manual Review Loans", f"{len(high_risk):,}"),
             ("Exposure Amount", f"${exposure_amount:,.0f}"),
             ("Expected Default Rate", f"{expected_default_rate:.1%}"),
-        ])
+        ], colors=[TIER_COLORS["Manual review"]] * 3)
 
     panel_open("Does the risk tiering actually work?", "Default rate should climb as recommended action gets more severe — this is the real test of the system.")
     if not risk_df.empty:
@@ -671,16 +791,16 @@ elif page == "analytics":
         panel_open("Default Rate by Grade")
         grade_stats = filtered.groupby("grade")["default_flag"].mean().reset_index()
         grade_stats.columns = ["grade", "default_rate"]
-        st.altair_chart(styled_bar_chart(grade_stats, "grade", "default_rate"), use_container_width=True)
+        st.altair_chart(styled_bar_chart(grade_stats, "grade", "default_rate", color_map=GRADE_INK), use_container_width=True)
         panel_close()
 
     with col2:
         panel_open("Risk Score Distribution")
         filtered_scores = risk_df[risk_df["loan_id"].isin(filtered["loan_id"])]
         if not filtered_scores.empty:
-            hist = alt.Chart(filtered_scores).mark_bar(color="#C9A24B", size=6).encode(
-                x=alt.X("risk_score:Q", bin=alt.Bin(maxbins=30), axis=alt.Axis(labelColor="#8B96AC", titleColor="#8B96AC", domainColor="#26314A", tickColor="#26314A")),
-                y=alt.Y("count():Q", axis=alt.Axis(labelColor="#8B96AC", titleColor="#8B96AC", domainColor="#26314A", tickColor="#26314A", gridColor="#182036")),
+            hist = alt.Chart(filtered_scores).mark_bar(color=GRADE_INK["D"], size=6).encode(
+                x=alt.X("risk_score:Q", bin=alt.Bin(maxbins=30), axis=alt.Axis(labelFont="JetBrains Mono", titleFont="Work Sans", labelColor=AXIS_LABEL_COLOR, titleColor=AXIS_LABEL_COLOR, domainColor=AXIS_LINE_COLOR, tickColor=AXIS_LINE_COLOR)),
+                y=alt.Y("count():Q", axis=alt.Axis(labelFont="JetBrains Mono", titleFont="Work Sans", labelColor=AXIS_LABEL_COLOR, titleColor=AXIS_LABEL_COLOR, domainColor=AXIS_LINE_COLOR, tickColor=AXIS_LINE_COLOR, gridColor=AXIS_GRID_COLOR)),
             ).properties(height=260, background="transparent").configure_view(strokeWidth=0)
             st.altair_chart(hist, use_container_width=True)
         panel_close()
@@ -806,17 +926,17 @@ elif page == "vintage":
             "Vintage curves",
             "Each line is one origination quarter. Gray lines are 2010–2018 cohorts; red lines are 2007–2009, the financial crisis window.",
         )
-        base = alt.Chart(noncrisis_df).mark_line(strokeWidth=1, opacity=0.35).encode(
-            x=alt.X("mob_bucket:Q", title="Months on book", axis=alt.Axis(labelColor="#8B96AC", titleColor="#8B96AC", domainColor="#26314A", tickColor="#26314A")),
-            y=alt.Y("cumulative_default_rate:Q", title="Cumulative default rate", axis=alt.Axis(format=".0%", labelColor="#8B96AC", titleColor="#8B96AC", domainColor="#26314A", tickColor="#26314A", gridColor="#182036")),
+        base = alt.Chart(noncrisis_df).mark_line(strokeWidth=1, opacity=0.4).encode(
+            x=alt.X("mob_bucket:Q", title="Months on book", axis=alt.Axis(labelFont="JetBrains Mono", titleFont="Work Sans", labelColor=AXIS_LABEL_COLOR, titleColor=AXIS_LABEL_COLOR, domainColor=AXIS_LINE_COLOR, tickColor=AXIS_LINE_COLOR)),
+            y=alt.Y("cumulative_default_rate:Q", title="Cumulative default rate", axis=alt.Axis(format=".0%", labelFont="JetBrains Mono", titleFont="Work Sans", labelColor=AXIS_LABEL_COLOR, titleColor=AXIS_LABEL_COLOR, domainColor=AXIS_LINE_COLOR, tickColor=AXIS_LINE_COLOR, gridColor=AXIS_GRID_COLOR)),
             detail="origination_quarter:N",
-            color=alt.value("#8B96AC"),
+            color=alt.value(AXIS_LINE_COLOR),
         )
         crisis = alt.Chart(crisis_df).mark_line(strokeWidth=2.2).encode(
             x="mob_bucket:Q",
             y="cumulative_default_rate:Q",
             detail="origination_quarter:N",
-            color=alt.value("#C1543C"),
+            color=alt.value(GRADE_INK["G"]),
         )
         chart = (base + crisis).properties(height=380, background="transparent").configure_view(strokeWidth=0)
         st.altair_chart(chart, use_container_width=True)
@@ -892,19 +1012,21 @@ elif page == "stress":
             "Portfolio Expected Loss by scenario",
             "Each scenario shifts every loan's calibrated PD by the fitted unemployment sensitivity, scaled by that loan's origination-year risk.",
         )
-        kpi_row([
-            (scenario_labels[s], f"${stress_indexed.loc[s, 'portfolio_el']:,.0f}")
-            for s in scenario_order if s in stress_indexed.index
-        ])
+        present_scenarios = [s for s in scenario_order if s in stress_indexed.index]
+        kpi_row(
+            [(scenario_labels[s], f"${stress_indexed.loc[s, 'portfolio_el']:,.0f}") for s in present_scenarios],
+            colors=[STRESS_COLORS[s] for s in present_scenarios],
+        )
         panel_close()
 
         if "baseline" in stress_indexed.index:
             baseline_el = stress_indexed.loc["baseline", "portfolio_el"]
+            delta_scenarios = [s for s in present_scenarios if s != "baseline"]
             st.markdown('<div class="eyebrow">Increase vs Baseline</div>', unsafe_allow_html=True)
-            kpi_row([
-                (scenario_labels[s], f"+${stress_indexed.loc[s, 'portfolio_el'] - baseline_el:,.0f}")
-                for s in scenario_order if s in stress_indexed.index and s != "baseline"
-            ])
+            kpi_row(
+                [(scenario_labels[s], f"+${stress_indexed.loc[s, 'portfolio_el'] - baseline_el:,.0f}") for s in delta_scenarios],
+                colors=[STRESS_COLORS[s] for s in delta_scenarios],
+            )
 
         panel_open("Scenario sources", "Real Fed-published unemployment paths, not invented numbers.")
         st.dataframe(
@@ -969,9 +1091,10 @@ else:
     grade_rate_ranges = load_grade_rate_ranges()
     grade_min_rate, grade_max_rate = grade_rate_ranges.loc[grade, ["min_rate", "max_rate"]]
     if not (grade_min_rate <= interest_rate <= grade_max_rate):
+        warn_color = GRADE_INK["G"]
         st.markdown(f"""
-        <div style="background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--risk-high); padding: 14px 18px; margin-bottom: 20px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13.5px; color: var(--text);">
-        <strong style="color: var(--risk-high);">Out of distribution —</strong> Grade {grade} loans in the historical data run {grade_min_rate:.1f}%–{grade_max_rate:.1f}% — {interest_rate:.1f}% has never occurred for this grade, since Lending Club sets rate mostly by grade. The model has never seen this combination, so the score below is an extrapolation and may not be reliable.
+        <div style="background: var(--surface); border: 1px solid var(--border); border-left: 3px solid {warn_color}; padding: 14px 18px; margin-bottom: 20px; font-family: 'Work Sans', sans-serif; font-size: 13.5px; color: var(--text);">
+        <strong style="color: {warn_color};">Out of distribution —</strong> Grade {grade} loans in the historical data run {grade_min_rate:.1f}%–{grade_max_rate:.1f}% — {interest_rate:.1f}% has never occurred for this grade, since Lending Club sets rate mostly by grade. The model has never seen this combination, so the score below is an extrapolation and may not be reliable.
         </div>
         """, unsafe_allow_html=True)
 

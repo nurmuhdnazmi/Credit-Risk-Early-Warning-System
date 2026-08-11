@@ -7,3 +7,6 @@ archive/*.csv
 CLAUDE.md
 .streamlit/secrets.toml
 database/full_dump.sql
+.venv311/
+venv/
+env/

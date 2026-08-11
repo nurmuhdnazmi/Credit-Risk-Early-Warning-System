@@ -163,11 +163,13 @@ cd python
 python3 train_model.py
 python3 explain_and_score.py
 python3 stress_test.py
-cd ../dashboard
-streamlit run app.py
+cd ..
+streamlit run dashboard/app.py
 ```
 
-Copy `.env.example` to `.env` at the repo root, in `python/`, and in `dashboard/`, and fill in your own MySQL credentials first. `ingest.py` and the dashboard/pipeline scripts read relative paths (`archive/...`, `../models/...`) assuming they're run from the working directories shown above, not the repo root throughout.
+Run the dashboard from the repo root, not from inside `dashboard/` — it needs to be there to pick up `.streamlit/config.toml`, and it's also how Streamlit Community Cloud runs it, so local and deployed behavior match.
+
+Copy `.env.example` to `.env` at the repo root, in `python/`, and in `dashboard/`, and fill in your own MySQL credentials first. `ingest.py` and the `python/` pipeline scripts read relative paths (`archive/...`, `../models/...`) assuming they're run from the working directories shown above; the dashboard resolves its own paths from `__file__` instead, so it works from any working directory.
 
 ## Limitations, stated plainly
 
