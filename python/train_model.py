@@ -60,8 +60,7 @@ print("=" * 60)
 # fill with 0 rather than dropping rows.
 df["employment_length"] = df["employment_length"].fillna(0)
 
-# Some annual_income / dti rows may be missing or zero — drop those,
-# since they're a small fraction and imputing income is risky.
+# Some annual_income / dti rows may be missing or zero
 before = len(df)
 df = df.dropna(subset=["annual_income", "dti", "loan_to_income_ratio"])
 df = df[df["annual_income"] > 0]
