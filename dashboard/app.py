@@ -13,16 +13,10 @@ load_dotenv()
 
 st.set_page_config(page_title="Credit Risk Early Warning System", layout="wide", page_icon="◆")
 
-# Resolved from this file's own location rather than a "../models" relative
-# path, since the working directory differs between local runs (dashboard/)
-# and Streamlit Community Cloud, which always runs from the repo root.
 MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models")
 
 
 def get_config(key, default=None):
-    # st.secrets takes priority (Streamlit Cloud), falling back to .env /
-    # environment variables (local). Accessing st.secrets raises when no
-    # secrets.toml exists anywhere, which is the normal local case.
     try:
         value = st.secrets.get(key)
     except Exception:
@@ -38,10 +32,6 @@ DB_HOST = get_config("DB_HOST", "localhost")
 DB_PORT = get_config("DB_PORT", "3306")
 DB_NAME = get_config("DB_NAME", "credit_risk_platform")
 
-# Managed MySQL (e.g. Aiven's free tier) requires TLS and hands out a CA
-# certificate. DB_SSL_CA can be either a path to that file (set it this way
-# locally) or the certificate's PEM content pasted directly into Streamlit
-# Cloud secrets, since Cloud secrets can't reference a file on disk.
 DB_SSL_CA = get_config("DB_SSL_CA")
 connect_args = {}
 if DB_SSL_CA:
@@ -54,8 +44,7 @@ if DB_SSL_CA:
     connect_args["ssl_ca"] = ca_path
     connect_args["ssl_verify_cert"] = True
 
-# Matches the flat LGD assumption used in explain_and_score.py, so live
-# expected-loss figures for loans outside the scored test set stay consistent.
+
 LGD_ASSUMPTION = 0.45
 
 engine = create_engine(
@@ -520,22 +509,17 @@ def panel_close():
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-# Seven-stop ramp mapped to the real loan grades A (safest) through G
-# (riskiest), interpolated in OKLCH from three anchor colors so the hue
-# shifts smoothly (teal -> amber -> rust) rather than muddying through gray.
 GRADE_ORDER = ["A", "B", "C", "D", "E", "F", "G"]
 GRADE_COLORS = {
     "A": "#2F6F5E", "B": "#578454", "C": "#8D9242", "D": "#C79A3E",
     "E": "#B97830", "F": "#A5582D", "G": "#8C3B2E",
 }
-# Same hues, darkened where needed (C, D, E) to clear text/line contrast on
-# the light page background — the raw swatch colors above read fine as
-# large fills but two of them (C, D) fall below 3:1 as thin text or lines.
+
 GRADE_INK = {
     "A": "#2F6F5E", "B": "#578454", "C": "#757A28", "D": "#996E00",
     "E": "#A66619", "F": "#A5582D", "G": "#8C3B2E",
 }
-# Which text color reads best on a filled swatch of each grade's color.
+
 GRADE_TEXT_ON_FILL = {
     "A": "#FFFFFF", "B": "#FFFFFF", "C": "#1C2321", "D": "#1C2321",
     "E": "#1C2321", "F": "#FFFFFF", "G": "#FFFFFF",
@@ -563,10 +547,6 @@ def render_grade_strip(default_rate_by_grade):
         swatches += f'<div class="grade-swatch" style="background:{GRADE_COLORS[g]}; color:{GRADE_TEXT_ON_FILL[g]};"><div class="grade-letter">{g}</div>{rate_html}{tooltip}</div>'
     st.markdown(f'<div class="grade-strip">{swatches}</div>', unsafe_allow_html=True)
 
-
-# The four risk-action tiers aren't grades, but they're an ordered severity
-# scale too, so they draw from the same ramp instead of a separate palette —
-# one color language for every risk decision in the app.
 TIER_COLORS = {
     "Standard monitoring": GRADE_INK["B"],
     "Increase monitoring": GRADE_INK["D"],
@@ -575,7 +555,7 @@ TIER_COLORS = {
 }
 TIER_ORDER = ["Standard monitoring", "Increase monitoring", "Reduce credit limit", "Manual review"]
 
-# Stress scenarios are a severity scale too: calm, caution, danger.
+
 STRESS_COLORS = {
     "baseline": GRADE_INK["A"],
     "adverse": GRADE_INK["D"],
@@ -666,8 +646,7 @@ def render_scoring_result(X_row, loan_amount, actual_outcome=None):
     shap_values = explainer.shap_values(X_transformed)[0]
 
     top_idx_all = np.argsort(np.abs(shap_values))[::-1]
-    # only the reasons pushing risk UP belong in "why this was flagged" —
-    # a protective factor isn't a reason for the recommendation
+
     risk_increasing_idx = [i for i in top_idx_all if shap_values[i] > 0][:3]
 
     reason_html = ""
@@ -773,8 +752,8 @@ def compute_grade_benchmarks(grade, interest_rate, loan_amount):
 @st.cache_resource
 def load_model_and_explainer():
     saved_model = joblib.load(os.path.join(MODELS_DIR, "xgb_model_v1.joblib"))
-    pipeline = saved_model["pipeline"]  # raw preprocess+model, needed for SHAP
-    calibrated_model = saved_model["calibrated_model"]  # source of every probability shown
+    pipeline = saved_model["pipeline"]  
+    calibrated_model = saved_model["calibrated_model"] 
     model = pipeline.named_steps["model"]
     preprocessor = pipeline.named_steps["preprocess"]
     explainer = shap.TreeExplainer(model)
@@ -804,10 +783,6 @@ NAV_ITEMS = [
 if "page" not in st.session_state:
     st.session_state.page = st.query_params.get("page", "overview")
 
-# Icons are baked into a data-URI background-image per button, positioned by
-# nth-of-type, since a plain st.button label can't hold raw SVG. Two color
-# bakes are needed since the active tab is now a solid fill (white icon)
-# while inactive tabs sit on transparent/dark (muted-gray icon).
 def _icon_uri(icon, color):
     return "data:image/svg+xml;base64," + base64.b64encode(icon.replace("currentColor", color).encode()).decode()
 
