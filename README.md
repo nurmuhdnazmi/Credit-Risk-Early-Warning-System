@@ -169,7 +169,3 @@ Copy `.env.example` to `.env` at the repo root, in `python/`, and in `dashboard/
 ## Limitations, stated plainly
 
 Lending Club provides no true customer identifier or age field, so each loan is treated as one customer record. Repayment history is a snapshot built from real aggregate fields (last payment, total paid, delinquency flag), not a full payment by payment ledger, since that granularity isn't in the source data. Loss Given Default is a flat 45% assumption, not modeled. Risk tier boundaries are percentile based against the scored population and reflect a judgment call about what share of a portfolio a team could realistically review manually, not a figure calibrated against any real institution's actual capacity. The stress test's unemployment sensitivity, fit on only 12 annual data points, should be read as directional rather than precise.
-
-## Author
-
-Built by Nurmuhammad Nazmi.
